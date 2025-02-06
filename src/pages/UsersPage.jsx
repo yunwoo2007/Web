@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
-import { collection, onSnapshot, deleteDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot, deleteDoc, doc, addDoc } from "firebase/firestore";
 import { updateUser } from "../utils/firebase_auth";
 
 const SUBJECTS = [
@@ -18,7 +18,9 @@ const SUBJECTS = [
 
 function UsersPage() {
     const [users, setUsers] = useState([]);
-    const [expandedUser, setExpandedUser] = useState(null); // Tracks which user card is expanded
+    const [expandedUser, setExpandedUser] = useState(null);
+    const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+    const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
@@ -51,12 +53,38 @@ function UsersPage() {
     const handleDeleteUser = async (userId) => {
         if (!window.confirm("Are you sure you want to delete this user?")) return;
         await deleteDoc(doc(db, "users", userId));
-        setUsers(users.filter(user => user.id !== userId)); // Update UI after deletion
+        setUsers(users.filter(user => user.id !== userId));
+    };
+
+    const handleAddUser = async () => {
+        if (!newUser.name || !newUser.email || !newUser.password) {
+            alert("Please fill all fields!");
+            return;
+        }
+        await addDoc(collection(db, "users"), {
+            name: newUser.name,
+            email: newUser.email,
+            password: newUser.password,
+            subject: []
+        });
+        setNewUser({ name: "", email: "", password: "" });
+        setIsAddUserModalOpen(false);
     };
 
     return (
         <div className="flex flex-col items-center p-6">
-            <h2 className="text-2xl font-bold mb-6">Teachers</h2>
+            {/* Header with "Add User" Button */}
+            <div className="flex justify-between w-full max-w-4xl mb-6">
+                <h2 className="text-2xl font-bold">Teachers</h2>
+                <button
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg"
+                    onClick={() => setIsAddUserModalOpen(true)}
+                >
+                    Add User
+                </button>
+            </div>
+
+            {/* User Cards */}
             <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
                 {users.map((user) => (
                     <div 
@@ -77,7 +105,7 @@ function UsersPage() {
                                             key={sub}
                                             className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg"
                                             onClick={(e) => {
-                                                e.stopPropagation(); // Prevents card from closing
+                                                e.stopPropagation();
                                                 handleDeleteSubject(user.id, sub);
                                             }}
                                         >
@@ -112,9 +140,52 @@ function UsersPage() {
                     </div>
                 ))}
             </div>
+
+            {/* Add User Modal */}
+            {isAddUserModalOpen && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-white p-6 rounded-lg w-96">
+                        <h3 className="text-xl font-semibold mb-4">Add New User</h3>
+                        <input
+                            type="text"
+                            placeholder="Name"
+                            value={newUser.name}
+                            onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                            className="w-full p-2 mb-3 border rounded-lg"
+                        />
+                        <input
+                            type="email"
+                            placeholder="Email"
+                            value={newUser.email}
+                            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                            className="w-full p-2 mb-3 border rounded-lg"
+                        />
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            value={newUser.password}
+                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                            className="w-full p-2 mb-3 border rounded-lg"
+                        />
+                        <div className="flex justify-between mt-4">
+                            <button
+                                className="bg-gray-400 text-white px-4 py-2 rounded-lg"
+                                onClick={() => setIsAddUserModalOpen(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="bg-green-500 text-white px-4 py-2 rounded-lg"
+                                onClick={handleAddUser}
+                            >
+                                Add User
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 export default UsersPage;
-
