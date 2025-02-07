@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
-import { collection, onSnapshot, deleteDoc, doc, addDoc } from "firebase/firestore";
-import { updateUser } from "../utils/firebase_auth";
+import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
+import { auth } from "../utils/firebase_auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 
 const SUBJECTS = [
     "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
@@ -33,47 +34,41 @@ function UsersPage() {
         return () => unsubscribe();
     }, []);
 
-    const handleDeleteSubject = async (userId, subject) => {
-        const user = users.find(u => u.id === userId);
-        if (!user) return;
-        
-        const updatedSubjects = user.subject.filter(sub => sub !== subject);
-        await updateUser(userId, { ...user, subject: updatedSubjects });
-    };
-
-    const handleAddSubject = async (userId, subject) => {
-        if (!subject) return;
-        const user = users.find(u => u.id === userId);
-        if (!user) return;
-        
-        const updatedSubjects = [...user.subject, subject];
-        await updateUser(userId, { ...user, subject: updatedSubjects });
-    };
-
-    const handleDeleteUser = async (userId) => {
-        if (!window.confirm("Are you sure you want to delete this user?")) return;
-        await deleteDoc(doc(db, "users", userId));
-        setUsers(users.filter(user => user.id !== userId));
-    };
-
     const handleAddUser = async () => {
         if (!newUser.name || !newUser.email || !newUser.password) {
             alert("Please fill all fields!");
             return;
         }
-        await addDoc(collection(db, "users"), {
-            name: newUser.name,
-            email: newUser.email,
-            password: newUser.password,
-            subject: []
-        });
-        setNewUser({ name: "", email: "", password: "" });
-        setIsAddUserModalOpen(false);
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
+            const userId = userCredential.user.uid;
+
+            await addDoc(collection(db, "users"), {
+                id: userId,
+                name: newUser.name,
+                email: newUser.email,
+                subject: []
+            });
+            setNewUser({ name: "", email: "", password: "" });
+            setIsAddUserModalOpen(false);
+        } catch (error) {
+            console.error("Error adding user:", error);
+            alert(error.message);
+        }
+    };
+
+    const handleAddSubject = async (userId, subject) => {
+        if (!subject) return;
+        const userRef = doc(db, "users", userId);
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
+
+        const updatedSubjects = user.subject ? [...user.subject, subject] : [subject];
+        await updateDoc(userRef, { subject: updatedSubjects });
     };
 
     return (
         <div className="flex flex-col items-center p-6">
-            {/* Header with "Add User" Button */}
             <div className="flex justify-between w-full max-w-4xl mb-6">
                 <h2 className="text-2xl font-bold">Teachers</h2>
                 <button
@@ -84,7 +79,6 @@ function UsersPage() {
                 </button>
             </div>
 
-            {/* User Cards */}
             <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
                 {users.map((user) => (
                     <div 
@@ -101,91 +95,31 @@ function UsersPage() {
                                 <h4 className="font-semibold">Subjects:</h4>
                                 <div className="flex flex-wrap gap-2 mt-2">
                                     {user.subject?.map((sub) => (
-                                        <button
+                                        <span
                                             key={sub}
                                             className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteSubject(user.id, sub);
-                                            }}
                                         >
-                                            {sub} <span className="text-red-500 ml-2">(Delete)</span>
-                                        </button>
+                                            {sub}
+                                        </span>
                                     ))}
                                 </div>
                                 <select
                                     className="w-full p-2 mt-4 border rounded-lg"
-                                    onChange={(e) => {
-                                        e.stopPropagation();
-                                        handleAddSubject(user.id, e.target.value);
-                                    }}
+                                    onChange={(e) => handleAddSubject(user.id, e.target.value)}
                                 >
                                     <option value="">Select Subject to Add</option>
                                     {SUBJECTS.filter(sub => !user.subject?.includes(sub)).map((sub) => (
                                         <option key={sub} value={sub}>{sub}</option>
                                     ))}
                                 </select>
-
-                                <button
-                                    className="w-full mt-4 p-2 bg-red-500 text-white rounded-lg"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteUser(user.id);
-                                    }}
-                                >
-                                    Delete User
-                                </button>
                             </div>
                         )}
                     </div>
                 ))}
             </div>
-
-            {/* Add User Modal */}
-            {isAddUserModalOpen && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-white p-6 rounded-lg w-96">
-                        <h3 className="text-xl font-semibold mb-4">Add New User</h3>
-                        <input
-                            type="text"
-                            placeholder="Name"
-                            value={newUser.name}
-                            onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                            className="w-full p-2 mb-3 border rounded-lg"
-                        />
-                        <input
-                            type="email"
-                            placeholder="Email"
-                            value={newUser.email}
-                            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                            className="w-full p-2 mb-3 border rounded-lg"
-                        />
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            value={newUser.password}
-                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                            className="w-full p-2 mb-3 border rounded-lg"
-                        />
-                        <div className="flex justify-between mt-4">
-                            <button
-                                className="bg-gray-400 text-white px-4 py-2 rounded-lg"
-                                onClick={() => setIsAddUserModalOpen(false)}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="bg-green-500 text-white px-4 py-2 rounded-lg"
-                                onClick={handleAddUser}
-                            >
-                                Add User
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
 
 export default UsersPage;
+
