@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
-import { collection, onSnapshot, deleteDoc, doc, setDoc } from "firebase/firestore";
-import { createUserWithEmailAndPassword, deleteUser } from "../utils/firebase_auth";
-import { auth } from "../utils/firebase_config";
+import { collection, onSnapshot, deleteDoc, doc, addDoc } from "firebase/firestore";
+import { updateUser } from "../utils/firebase_auth";
 
 const SUBJECTS = [
     "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
@@ -34,10 +33,27 @@ function UsersPage() {
         return () => unsubscribe();
     }, []);
 
-    const handleDeleteUser = async (userEmail) => {
+    const handleDeleteSubject = async (userId, subject) => {
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
+        
+        const updatedSubjects = user.subject.filter(sub => sub !== subject);
+        await updateUser(userId, { ...user, subject: updatedSubjects });
+    };
+
+    const handleAddSubject = async (userId, subject) => {
+        if (!subject) return;
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
+        
+        const updatedSubjects = [...user.subject, subject];
+        await updateUser(userId, { ...user, subject: updatedSubjects });
+    };
+
+    const handleDeleteUser = async (userId) => {
         if (!window.confirm("Are you sure you want to delete this user?")) return;
-        await deleteDoc(doc(db, "users", userEmail));
-        setUsers(users.filter(user => user.id !== userEmail));
+        await deleteDoc(doc(db, "users", userId));
+        setUsers(users.filter(user => user.id !== userId));
     };
 
     const handleAddUser = async () => {
@@ -45,24 +61,14 @@ function UsersPage() {
             alert("Please fill all fields!");
             return;
         }
-
-        try {
-            // Firebase Authentication에 사용자 추가
-            const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
-            const user = userCredential.user;
-
-            // Firestore에 사용자 정보 추가 (이메일을 ID로 사용)
-            await setDoc(doc(db, "users", newUser.email), {
-                name: newUser.name,
-                email: newUser.email,
-                subject: []
-            });
-
-            setNewUser({ name: "", email: "", password: "" });
-            setIsAddUserModalOpen(false);
-        } catch (error) {
-            alert("Error adding user: " + error.message);
-        }
+        await addDoc(collection(db, "users"), {
+            name: newUser.name,
+            email: newUser.email,
+            password: newUser.password,
+            subject: []
+        });
+        setNewUser({ name: "", email: "", password: "" });
+        setIsAddUserModalOpen(false);
     };
 
     return (
@@ -89,16 +95,47 @@ function UsersPage() {
                         <h3 className="text-lg font-semibold">{user.name}</h3>
                         <p className="text-gray-600">ID: {user.id}</p>
                         <p className="text-gray-600">Email: {user.email}</p>
+
                         {expandedUser === user.id && (
-                            <button
-                                className="w-full mt-4 p-2 bg-red-500 text-white rounded-lg"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteUser(user.id);
-                                }}
-                            >
-                                Delete User
-                            </button>
+                            <div className="mt-4">
+                                <h4 className="font-semibold">Subjects:</h4>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {user.subject?.map((sub) => (
+                                        <button
+                                            key={sub}
+                                            className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteSubject(user.id, sub);
+                                            }}
+                                        >
+                                            {sub} <span className="text-red-500 ml-2">(Delete)</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                <select
+                                    className="w-full p-2 mt-4 border rounded-lg"
+                                    onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleAddSubject(user.id, e.target.value);
+                                    }}
+                                >
+                                    <option value="">Select Subject to Add</option>
+                                    {SUBJECTS.filter(sub => !user.subject?.includes(sub)).map((sub) => (
+                                        <option key={sub} value={sub}>{sub}</option>
+                                    ))}
+                                </select>
+
+                                <button
+                                    className="w-full mt-4 p-2 bg-red-500 text-white rounded-lg"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteUser(user.id);
+                                    }}
+                                >
+                                    Delete User
+                                </button>
+                            </div>
                         )}
                     </div>
                 ))}
