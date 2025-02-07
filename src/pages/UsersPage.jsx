@@ -92,7 +92,7 @@ function UsersPage() {
 
                         {expandedUser === user.id && (
                             <div className="mt-4">
-                                <h4 className="font-semibold">Subjects:</h4>
+                                <h4 className="text-base font-semibold">Subjects:</h4>
                                 <div className="flex flex-wrap gap-2 mt-2">
                                     {user.subject?.map((sub) => (
                                         <span
@@ -103,15 +103,22 @@ function UsersPage() {
                                         </span>
                                     ))}
                                 </div>
-                                <select
-                                    className="w-full p-2 mt-4 border rounded-lg"
-                                    onChange={(e) => handleAddSubject(user.id, e.target.value)}
-                                >
-                                    <option value="">Select Subject to Add</option>
-                                    {SUBJECTS.filter(sub => !user.subject?.includes(sub)).map((sub) => (
-                                        <option key={sub} value={sub}>{sub}</option>
-                                    ))}
-                                </select>
+                                <div className="mt-2">
+                                    <button className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg" onClick={(e) => e.stopPropagation()}>
+                                        Select Subject
+                                    </button>
+                                    <div className="mt-2">
+                                        {SUBJECTS.filter(sub => !user.subject?.includes(sub)).map((sub) => (
+                                            <button 
+                                                key={sub} 
+                                                className="block w-full text-left p-2 bg-white border-b hover:bg-gray-100" 
+                                                onClick={() => handleAddSubject(user.id, sub)}
+                                            >
+                                                {sub}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
