@@ -3,12 +3,13 @@ import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
 import { auth } from "../utils/firebase_auth";
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import { FiEdit } from "react-icons/fi";
 
 const SUBJECTS = [
     "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
     "Pre-Kindergarten", "Kindergarten", "6th Grade ELA", "Math 6AB",
     "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies",
-    "6th Grade Science", "6th Grade Band", "6th Grade Computer Science", 
+    "6th Grade Science", "6th Grade Band", "6th Grade Computer Science",
     "6th Grade Creative Problem Solving", "6th Grade Visual Arts",
     "6th Grade Physical Education", "6th Grade Orchestra", "Math 6B/7AB",
     "Math 7AB", "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies",
@@ -22,6 +23,7 @@ function UsersPage() {
     const [expandedUser, setExpandedUser] = useState(null);
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
+    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
@@ -57,78 +59,82 @@ function UsersPage() {
         }
     };
 
-    const handleAddSubject = async (userId, subject) => {
-        if (!subject) return;
+    const handleToggleSubject = async (userId, subject) => {
         const userRef = doc(db, "users", userId);
         const user = users.find(u => u.id === userId);
         if (!user) return;
 
-        const updatedSubjects = user.subject ? [...user.subject, subject] : [subject];
+        const updatedSubjects = user.subject?.includes(subject)
+            ? user.subject.filter(sub => sub !== subject)
+            : [...(user.subject || []), subject];
+
         await updateDoc(userRef, { subject: updatedSubjects });
+        setIsSubjectModalOpen(false);
     };
 
     return (
-        <div className="flex flex-col items-center p-6">
-            <div className="flex justify-between w-full max-w-4xl mb-6">
-                <h2 className="text-2xl font-bold">Teachers</h2>
+        <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
+            <div className="flex justify-between w-full max-w-6xl mb-6">
+                <h2 className="text-3xl font-bold text-gray-800">Manage Users</h2>
                 <button
-                    className="bg-blue-500 text-white px-4 py-2 rounded-lg"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md transition"
                     onClick={() => setIsAddUserModalOpen(true)}
                 >
-                    Add User
+                    + Add User
                 </button>
             </div>
 
-            <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
-                {users.map((user) => (
-                    <div 
-                        key={user.id} 
-                        className="bg-white shadow-lg rounded-lg p-6 border cursor-pointer"
-                        onClick={() => setExpandedUser(expandedUser === user.id ? null : user.id)}
-                    >
-                        <h3 className="text-lg font-semibold">{user.name}</h3>
-                        <p className="text-gray-600">ID: {user.id}</p>
-                        <p className="text-gray-600">Email: {user.email}</p>
+            <table className="w-full max-w-6xl bg-white shadow-md rounded-lg overflow-hidden border border-gray-300">
+                <thead className="bg-gray-200 text-gray-700 border-b border-gray-400">
+                    <tr>
+                        <th className="px-4 py-3 border-r border-gray-300">Role</th>
+                        <th className="px-4 py-3 border-r border-gray-300">User Name</th>
+                        <th className="px-4 py-3 border-r border-gray-300">Email</th>
+                        <th className="px-4 py-3 border-r border-gray-300">Subjects</th>
+                        <th className="px-4 py-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {users.map((user, index) => (
+                        <tr key={user.id} className={`border-b ${index % 2 === 0 ? 'bg-gray-100' : 'bg-white'}`}>
+                            <td className="px-4 py-3 border-r border-gray-300">Admin</td>
+                            <td className="px-4 py-3 border-r border-gray-300">{user.name}</td>
+                            <td className="px-4 py-3 border-r border-gray-300">{user.email}</td>
+                            <td className="px-4 py-3 border-r border-gray-300">
+                                {user.subject?.join(", ") || "No subjects assigned"}
+                            </td>
+                            <td className="px-4 py-3">
+                                <button onClick={() => {
+                                    setExpandedUser(user.id);
+                                    setIsSubjectModalOpen(true);
+                                }}>
+                                    <FiEdit className="text-blue-600 hover:text-blue-800" />
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
 
-                        {expandedUser === user.id && (
-                            <div className="mt-4">
-                                <h4 className="text-base font-semibold">Subjects:</h4>
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {user.subject?.map((sub) => (
-                                        <span
-                                            key={sub}
-                                            className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg"
-                                        >
-                                            {sub}
-                                        </span>
-                                    ))}
-                                </div>
-                                <div className="mt-2">
-                                    <button className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg" onClick={(e) => e.stopPropagation()}>
-                                        Select Subject
-                                    </button>
-                                    <div className="mt-2">
-                                        {SUBJECTS.filter(sub => !user.subject?.includes(sub)).map((sub) => (
-                                            <button 
-                                                key={sub} 
-                                                className="block w-full text-left p-2 bg-white border-b hover:bg-gray-100" 
-                                                onClick={() => handleAddSubject(user.id, sub)}
-                                            >
-                                                {sub}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+            {isSubjectModalOpen && expandedUser && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+                    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Manage Subjects</h4>
+                        <select
+                            className="w-full p-2 border border-gray-300 rounded-lg"
+                            onChange={(e) => handleToggleSubject(expandedUser, e.target.value)}
+                        >
+                            <option value="">Select a subject</option>
+                            {SUBJECTS.map((sub) => (
+                                <option key={sub} value={sub}>{sub}</option>
+                            ))}
+                        </select>
+                        <button className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg" onClick={() => setIsSubjectModalOpen(false)}>Close</button>
                     </div>
-                ))}
-            </div>
+                </div>
+            )}
         </div>
     );
 }
-
 export default UsersPage;
-
-
 
