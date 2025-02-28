@@ -37,20 +37,10 @@ function UsersPage() {
 
             for (const row of parsedData) {
                 const { Name, Email, Subject } = row;
-                if (!Name || !Email || !Subject) {
-                    alert("All fields (Name, Email, Subject) must be filled!");
-                    return;
-                }
-                if (!Email.endsWith("@gmail.com")) {
-                    alert("Only Gmail addresses are allowed!");
-                    return;
-                }
+                if (!Name || !Email || !Subject) continue;
+                if (!Email.endsWith("@gmail.com")) continue;
                 const subjectList = Subject.split(",").map(sub => sub.trim()).filter(sub => SUBJECTS.includes(sub));
-                
-                if (subjectList.length === 0) {
-                    alert(`Invalid subject for user ${Name}. Check the subject list.`);
-                    return;
-                }
+                if (subjectList.length === 0) continue;
                 
                 try {
                     const userCredential = await createUserWithEmailAndPassword(auth, Email, "defaultPassword123");
@@ -63,10 +53,8 @@ function UsersPage() {
                     });
                 } catch (error) {
                     console.error("Error adding user:", error);
-                    alert(error.message);
                 }
             }
-            alert("Users uploaded successfully!");
             setIsBulkUploadModalOpen(false);
         };
         reader.readAsArrayBuffer(file);
