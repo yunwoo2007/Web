@@ -78,7 +78,7 @@ function UsersPage() {
             <table className="w-full max-w-6xl bg-white shadow-md rounded-lg overflow-hidden border border-red-600">
                 <thead className="bg-gray-200 text-gray-700 border-b border-red-600">
                     <tr>
-                        <th className="px-4 py-3 border-r border-red-600">Role</th>
+                        <th className="px-4 py-3 border-r border-red-600"></th>
                         <th className="px-4 py-3 border-r border-red-600">User Name</th>
                         <th className="px-4 py-3 border-r border-red-600">Email</th>
                         <th className="px-4 py-3 border-r border-red-600">Subjects</th>
