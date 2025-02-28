@@ -88,7 +88,7 @@ function UsersPage() {
                 <tbody>
                     {users.map((user, index) => (
                         <tr key={user.id} className={`border-b border-red-600 ${index % 2 === 0 ? 'bg-gray-100' : 'bg-white'}`}>
-                            <td className="px-4 py-3 border-r border-red-600">Admin</td>
+                            <td className="px-4 py-3 border-r border-red-600"></td>
                             <td className="px-4 py-3 border-r border-red-600">{user.name}</td>
                             <td className="px-4 py-3 border-r border-red-600">{user.email}</td>
                             <td className="px-4 py-3 border-r border-red-600">
