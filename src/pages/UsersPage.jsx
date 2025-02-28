@@ -4,7 +4,9 @@ import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "fireb
 import { auth } from "../utils/firebase_auth";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { FiEdit } from "react-icons/fi";
-import * as XLSX from "xlsx";
+import dynamic from "next/dynamic";
+
+const XLSX = dynamic(() => import("xlsx"), { ssr: false });
 
 const SUBJECTS = [
     "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
