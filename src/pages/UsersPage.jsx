@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
-import { auth, createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
+
+const auth = getAuth();
 
 const SUBJECTS = ["Math", "Science", "History", "English", "Art", "Music", "Physical Education"];
 
@@ -22,10 +24,14 @@ function UsersPage() {
         return () => unsubscribe();
     }, []);
 
-    const handleDeleteUser = async (userId) => {
+    const handleDeleteUser = async (userId, userEmail) => {
         if (!window.confirm("Are you sure you want to delete this user?")) return;
         try {
             await deleteDoc(doc(db, "users", userId));
+            const userRecord = auth.currentUser;
+            if (userRecord && userRecord.email === userEmail) {
+                await deleteUser(userRecord);
+            }
             setUsers(users.filter(user => user.id !== userId));
         } catch (error) {
             console.error("Error deleting user:", error);
@@ -35,7 +41,7 @@ function UsersPage() {
 
     const handleAddUser = async () => {
         try {
-            await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
+            const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
             await addDoc(collection(db, "users"), {
                 name: newUser.name,
                 email: newUser.email,
@@ -79,7 +85,7 @@ function UsersPage() {
                             <td className="px-4 py-3 border-r border-gray-600">{user.email}</td>
                             <td className="px-4 py-3 border-r border-gray-600">{user.subjects?.join(", ") || "No subjects assigned"}</td>
                             <td className="px-4 py-3">
-                                <button onClick={() => handleDeleteUser(user.id)} className="mr-2 text-red-600 hover:text-red-800">
+                                <button onClick={() => handleDeleteUser(user.id, user.email)} className="mr-2 text-red-600 hover:text-red-800">
                                     <FiTrash2 />
                                 </button>
                                 <button onClick={() => { setEditingUser(user); setSelectedSubjects(user.subjects || []); setIsSubjectModalOpen(true); }}>
