@@ -4,22 +4,8 @@ import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "fireb
 import { auth } from "../utils/firebase_auth";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { FiEdit } from "react-icons/fi";
-import dynamic from "next/dynamic";
 
-const XLSX = dynamic(() => import("xlsx"), { ssr: false });
-
-const SUBJECTS = [
-    "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
-    "Pre-Kindergarten", "Kindergarten", "6th Grade ELA", "Math 6AB",
-    "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies",
-    "6th Grade Science", "6th Grade Band", "6th Grade Computer Science",
-    "6th Grade Creative Problem Solving", "6th Grade Visual Arts",
-    "6th Grade Physical Education", "6th Grade Orchestra", "Math 6B/7AB",
-    "Math 7AB", "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies",
-    "7th Grade Science", "7th Grade Band", "7th Grade Computer Science",
-    "7th Grade Creative Problem Solving", "7th Grade Visual Arts",
-    "7th Grade Physical Education", "7th Grade Orchestra", "Spanish II(Middle School)"
-];
+const SUBJECTS = ["1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade", "Pre-Kindergarten", "Kindergarten", "6th Grade ELA", "Math 6AB", "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies", "6th Grade Science", "6th Grade Band", "6th Grade Computer Science", "6th Grade Creative Problem Solving", "6th Grade Visual Arts", "6th Grade Physical Education", "6th Grade Orchestra", "Math 6B/7AB", "Math 7AB", "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies", "7th Grade Science", "7th Grade Band", "7th Grade Computer Science", "7th Grade Creative Problem Solving", "7th Grade Visual Arts", "7th Grade Physical Education", "7th Grade Orchestra", "Spanish II(Middle School)"];
 
 function UsersPage() {
     const [users, setUsers] = useState([]);
@@ -27,7 +13,7 @@ function UsersPage() {
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
-    const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
+    const [selectedSubjects, setSelectedSubjects] = useState([]);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
@@ -40,41 +26,41 @@ function UsersPage() {
         return () => unsubscribe();
     }, []);
 
-    const handleFileUpload = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onload = async ({ target }) => {
-            const data = new Uint8Array(target.result);
-            const workbook = XLSX.read(data, { type: "array" });
-            const sheetName = workbook.SheetNames[0];
-            const sheet = workbook.Sheets[sheetName];
-            const parsedData = XLSX.utils.sheet_to_json(sheet);
+    const handleAddUser = async () => {
+        if (!newUser.name || !newUser.email || !newUser.password) {
+            alert("Please fill all fields!");
+            return;
+        }
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
+            const userId = userCredential.user.uid;
 
-            for (const row of parsedData) {
-                const { Name, Email, Subject } = row;
-                if (!Name || !Email || !Subject) continue;
-                if (!Email.endsWith("@gmail.com")) continue;
-                const subjectList = Subject.split(",").map(sub => sub.trim()).filter(sub => SUBJECTS.includes(sub));
-                if (subjectList.length === 0) continue;
-                
-                try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, Email, "defaultPassword123");
-                    const userId = userCredential.user.uid;
-                    await addDoc(collection(db, "users"), {
-                        id: userId,
-                        name: Name,
-                        email: Email,
-                        subject: subjectList
-                    });
-                } catch (error) {
-                    console.error("Error adding user:", error);
-                }
-            }
-            setIsBulkUploadModalOpen(false);
-        };
-        reader.readAsArrayBuffer(file);
+            await addDoc(collection(db, "users"), {
+                id: userId,
+                name: newUser.name,
+                email: newUser.email,
+                subject: []
+            });
+            setNewUser({ name: "", email: "", password: "" });
+            setIsAddUserModalOpen(false);
+        } catch (error) {
+            console.error("Error adding user:", error);
+            alert(error.message);
+        }
+    };
+
+    const handleToggleSubject = async (subject) => {
+        if (!expandedUser) return;
+
+        const userRef = doc(db, "users", expandedUser);
+        const user = users.find(u => u.id === expandedUser);
+        if (!user) return;
+
+        const updatedSubjects = user.subject?.includes(subject)
+            ? user.subject.filter(sub => sub !== subject)
+            : [...(user.subject || []), subject];
+
+        await updateDoc(userRef, { subject: updatedSubjects });
     };
 
     return (
@@ -82,25 +68,107 @@ function UsersPage() {
             <div className="flex justify-between w-full max-w-6xl mb-6">
                 <h2 className="text-3xl font-bold text-gray-800">Manage Users</h2>
                 <button
-                    className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg shadow-md transition"
-                    onClick={() => setIsBulkUploadModalOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md transition"
+                    onClick={() => setIsAddUserModalOpen(true)}
                 >
-                    📂 Bulk Upload
+                    + Add User
                 </button>
             </div>
-            
-            {isBulkUploadModalOpen && (
+
+            <table className="w-full max-w-6xl bg-white shadow-md rounded-lg overflow-hidden border border-red-600">
+                <thead className="bg-gray-200 text-gray-700 border-b border-red-600">
+                    <tr>
+                        <th className="px-4 py-3 border-r border-red-600">Role</th>
+                        <th className="px-4 py-3 border-r border-red-600">User Name</th>
+                        <th className="px-4 py-3 border-r border-red-600">Email</th>
+                        <th className="px-4 py-3 border-r border-red-600">Subjects</th>
+                        <th className="px-4 py-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {users.map((user, index) => (
+                        <tr key={user.id} className={`border-b border-red-600 ${index % 2 === 0 ? 'bg-gray-100' : 'bg-white'}`}>
+                            <td className="px-4 py-3 border-r border-red-600">Admin</td>
+                            <td className="px-4 py-3 border-r border-red-600">{user.name}</td>
+                            <td className="px-4 py-3 border-r border-red-600">{user.email}</td>
+                            <td className="px-4 py-3 border-r border-red-600">
+                                {user.subject?.join(", ") || "No subjects assigned"}
+                            </td>
+                            <td className="px-4 py-3">
+                                <button onClick={() => {
+                                    setExpandedUser(user.id);
+                                    setIsSubjectModalOpen(true);
+                                }}>
+                                    <FiEdit className="text-blue-600 hover:text-blue-800" />
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+
+            {isAddUserModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
                     <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Upload CSV/Excel</h4>
-                        <input type="file" accept=".csv, .xlsx" onChange={handleFileUpload} />
-                        <button className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg" onClick={() => setIsBulkUploadModalOpen(false)}>Close</button>
+                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Add New User</h4>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">Name</label>
+                            <input
+                                type="text"
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+                                value={newUser.name}
+                                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">Email</label>
+                            <input
+                                type="email"
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+                                value={newUser.email}
+                                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">Password</label>
+                            <input
+                                type="password"
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+                                value={newUser.password}
+                                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                            />
+                        </div>
+                        <button className="bg-blue-500 text-white px-4 py-2 rounded-lg" onClick={handleAddUser}>
+                            Add User
+                        </button>
+                        <button className="mt-4 text-red-500" onClick={() => setIsAddUserModalOpen(false)}>Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            {isSubjectModalOpen && expandedUser && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+                    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Manage Subjects</h4>
+                        <div className="max-h-60 overflow-y-auto">
+                            {SUBJECTS.map((sub) => (
+                                <label key={sub} className="block py-1">
+                                    <input
+                                        type="checkbox"
+                                        checked={users.find(u => u.id === expandedUser)?.subject?.includes(sub) || false}
+                                        onChange={() => handleToggleSubject(sub)}
+                                    />
+                                    {" "}{sub}
+                                </label>
+                            ))}
+                        </div>
+                        <button className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg" onClick={() => setIsSubjectModalOpen(false)}>Close</button>
                     </div>
                 </div>
             )}
         </div>
     );
 }
-export default UsersPage;
 
+export default UsersPage;
 
