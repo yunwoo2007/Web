@@ -59,7 +59,7 @@ const SUBJECTS = [ "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grad
                 </thead>
                 <tbody>
                     {users.map((user, index) => (
-                        <tr key={user.id} className={`border-b border-red-600 ${index % 2 === 0 ? 'bg-gray-100' : 'bg-white'}`}>
+                        <tr key={user.id} className={border-b border-red-600 ${index % 2 === 0 ? 'bg-gray-100' : 'bg-white'}}>
                             <td className="px-4 py-3 border-r border-red-600">Admin</td>
                             <td className="px-4 py-3 border-r border-red-600">{user.name}</td>
                             <td className="px-4 py-3 border-r border-red-600">{user.email}</td>
@@ -85,4 +85,3 @@ const SUBJECTS = [ "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grad
     );
 }
 export default UsersPage;
-
