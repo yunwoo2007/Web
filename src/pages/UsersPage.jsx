@@ -3,7 +3,7 @@ import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
 import { auth } from "../utils/firebase_auth";
 import { createUserWithEmailAndPassword, updateProfile, deleteUser } from "firebase/auth";
-import { FiEdit, FiTrash } from "react-icons/fi";
+import { FiEdit, FiTrash, FiUserPlus } from "react-icons/fi";
 
 const SUBJECTS = ["1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade", "Pre-Kindergarten", "Kindergarten", "6th Grade ELA", "Math 6AB", "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies", "6th Grade Science", "6th Grade Band", "6th Grade Computer Science", "6th Grade Creative Problem Solving", "6th Grade Visual Arts", "6th Grade Physical Education", "6th Grade Orchestra", "Math 6B/7AB", "Math 7AB", "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies", "7th Grade Science", "7th Grade Band", "7th Grade Computer Science", "7th Grade Creative Problem Solving", "7th Grade Visual Arts", "7th Grade Physical Education", "7th Grade Orchestra", "Spanish II(Middle School)"];
 
@@ -104,22 +104,19 @@ function UsersPage() {
                 </table>
             </div>
 
-            {isSubjectModalOpen && (
+            <button className="fixed bottom-6 right-6 bg-green-600 hover:bg-green-700 text-white p-4 rounded-full shadow-lg" onClick={() => setIsAddUserModalOpen(true)}>
+                <FiUserPlus size={24} />
+            </button>
+
+            {isAddUserModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
                     <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Edit Subjects</h4>
-                        <div className="max-h-40 overflow-y-auto border p-2 mb-3">
-                            {SUBJECTS.map((subject) => (
-                                <label key={subject} className="block">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedUserSubjects.includes(subject)}
-                                        onChange={() => handleToggleSubject(subject)}
-                                    /> {subject}
-                                </label>
-                            ))}
-                        </div>
-                        <button className="bg-red-500 text-white px-4 py-2 rounded-lg" onClick={() => setIsSubjectModalOpen(false)}>Close</button>
+                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Add New User</h4>
+                        <input type="text" placeholder="Name" className="w-full px-3 py-2 border mb-3" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
+                        <input type="email" placeholder="Email" className="w-full px-3 py-2 border mb-3" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+                        <input type="password" placeholder="Password" className="w-full px-3 py-2 border mb-3" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+                        <button className="bg-blue-500 text-white px-4 py-2 rounded-lg" onClick={handleAddUser}>Add User</button>
+                        <button className="mt-4 text-red-500" onClick={() => setIsAddUserModalOpen(false)}>Cancel</button>
                     </div>
                 </div>
             )}
