@@ -2,10 +2,21 @@ import { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
 import { auth } from "../utils/firebase_auth";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import { FiEdit } from "react-icons/fi";
 
-const SUBJECTS = ["Math", "Science", "History", "English"];
+const SUBJECTS = [
+    "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
+    "Pre-Kindergarten", "Kindergarten", "6th Grade ELA", "Math 6AB",
+    "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies",
+    "6th Grade Science", "6th Grade Band", "6th Grade Computer Science",
+    "6th Grade Creative Problem Solving", "6th Grade Visual Arts",
+    "6th Grade Physical Education", "6th Grade Orchestra", "Math 6B/7AB",
+    "Math 7AB", "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies",
+    "7th Grade Science", "7th Grade Band", "7th Grade Computer Science",
+    "7th Grade Creative Problem Solving", "7th Grade Visual Arts",
+    "7th Grade Physical Education", "7th Grade Orchestra", "Spanish II(Middle School)"
+];
 
 const AdminPage = () => {
   const [users, setUsers] = useState([]);
@@ -41,6 +52,10 @@ const AdminPage = () => {
   const handleDeleteUser = async (userId, uid) => {
     try {
       await deleteDoc(doc(db, "users", userId));
+      const user = auth.currentUser;
+      if (user && user.uid === uid) {
+        await deleteUser(user);
+      }
       setUsers(users.filter((user) => user.id !== userId));
     } catch (error) {
       console.error("Error deleting user:", error);
@@ -103,5 +118,6 @@ const AdminPage = () => {
 };
 
 export default AdminPage;
+
 
 
