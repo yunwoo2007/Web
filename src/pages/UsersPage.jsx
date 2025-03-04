@@ -37,8 +37,6 @@ const SUBJECTS = [
 function UsersPage() {
     const [users, setUsers] = useState([]);
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
-    const [expandedUser, setExpandedUser] = useState(null);
     const [newUser, setNewUser] = useState({ name: "", email: "", password: "", subjects: [] });
 
     useEffect(() => {
@@ -78,6 +76,26 @@ function UsersPage() {
         <div className="p-6">
             <h2 className="text-3xl font-bold">Manage Users</h2>
             <button onClick={() => setIsAddUserModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 mt-4 rounded">+ Add User</button>
+            <table className="w-full mt-4 border">
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>User Name</th>
+                        <th>Email</th>
+                        <th>Subjects</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {users.map((user) => (
+                        <tr key={user.id}>
+                            <td>Admin</td>
+                            <td>{user.name}</td>
+                            <td>{user.email}</td>
+                            <td>{user.subjects?.join(", ") || "No subjects assigned"}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
             {isAddUserModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
                     <div className="bg-white p-6 rounded shadow-md w-96">
@@ -85,11 +103,15 @@ function UsersPage() {
                         <input type="text" placeholder="Enter your name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="w-full mb-2 p-2 border rounded" />
                         <input type="email" placeholder="Enter your email address" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="w-full mb-2 p-2 border rounded" />
                         <input type="password" placeholder="Enter your password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className="w-full mb-2 p-2 border rounded" />
-                        <select multiple onChange={(e) => setNewUser({ ...newUser, subjects: Array.from(e.target.selectedOptions, option => option.value) })} className="w-full mb-2 p-2 border rounded">
-                            {SUBJECTS.map(subject => <option key={subject} value={subject}>{subject}</option>)}
-                        </select>
+                        {SUBJECTS.map(subject => (
+                            <div key={subject}>
+                                <input type="checkbox" value={subject} onChange={(e) => {
+                                    const updatedSubjects = e.target.checked ? [...newUser.subjects, subject] : newUser.subjects.filter(s => s !== subject);
+                                    setNewUser({ ...newUser, subjects: updatedSubjects });
+                                }} /> {subject}
+                            </div>
+                        ))}
                         <button onClick={handleAddUser} className="bg-blue-600 text-white px-4 py-2 rounded w-full">Submit</button>
-                        <button onClick={() => setIsAddUserModalOpen(false)} className="mt-2 bg-gray-500 text-white px-4 py-2 rounded w-full">Cancel</button>
                     </div>
                 </div>
             )}
