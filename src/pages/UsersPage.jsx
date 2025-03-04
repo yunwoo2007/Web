@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
 import { auth } from "../utils/firebase_auth";
-import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
 
 const SUBJECTS = [
@@ -38,15 +38,13 @@ function UsersPage() {
     const [users, setUsers] = useState([]);
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [newUser, setNewUser] = useState({ name: "", email: "", password: "", subjects: [] });
-    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
     const [expandedUser, setExpandedUser] = useState(null);
+    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+    const [selectedSubjects, setSelectedSubjects] = useState([]);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
-            const updatedUsers = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
+            const updatedUsers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
             setUsers(updatedUsers);
         });
         return () => unsubscribe();
@@ -59,31 +57,21 @@ function UsersPage() {
         }
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
-            const userId = userCredential.user.uid;
             await addDoc(collection(db, "users"), {
-                id: userId,
+                id: userCredential.user.uid,
                 name: newUser.name,
                 email: newUser.email,
                 subjects: newUser.subjects,
             });
-            setNewUser({ name: "", email: "", password: "", subjects: [] });
             setIsAddUserModalOpen(false);
         } catch (error) {
-            console.error("Error adding user:", error);
             alert(error.message);
         }
     };
 
     const handleDeleteUser = async (userId) => {
         if (!window.confirm("Are you sure you want to delete this user?")) return;
-        try {
-            await deleteDoc(doc(db, "users", userId));
-            const user = auth.currentUser;
-            if (user) await deleteUser(user);
-        } catch (error) {
-            console.error("Error deleting user:", error);
-            alert(error.message);
-        }
+        await deleteDoc(doc(db, "users", userId));
     };
 
     return (
@@ -111,6 +99,7 @@ function UsersPage() {
                                 <button onClick={() => handleDeleteUser(user.id)}><FiTrash2 /></button>
                                 <button onClick={() => {
                                     setExpandedUser(user.id);
+                                    setSelectedSubjects(user.subjects || []);
                                     setIsSubjectModalOpen(true);
                                 }}><FiEdit /></button>
                             </td>
@@ -122,4 +111,5 @@ function UsersPage() {
     );
 }
 export default UsersPage;
+
 
