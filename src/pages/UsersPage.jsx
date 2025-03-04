@@ -22,7 +22,7 @@ function UsersPage() {
                 id: doc.id,
                 ...doc.data(),
             }));
-            setUsers(updatedUsers);
+            setUsers(updatedUsers || []);
         });
         return () => unsubscribe();
     }, []);
@@ -89,7 +89,7 @@ function UsersPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {users.map((user) => (
+                        {users.length > 0 ? users.map((user) => (
                             <tr key={user.id} className="border-b">
                                 <td className="px-4 py-3">{user.name}</td>
                                 <td className="px-4 py-3">{user.email}</td>
@@ -99,7 +99,7 @@ function UsersPage() {
                                     <button onClick={() => handleDeleteUser(user.id)} className="text-red-600 hover:text-red-800"><FiTrash /></button>
                                 </td>
                             </tr>
-                        ))}
+                        )) : <tr><td colSpan="4" className="text-center py-4">No users available</td></tr>}
                     </tbody>
                 </table>
             </div>
@@ -107,19 +107,6 @@ function UsersPage() {
             <button className="fixed bottom-6 right-6 bg-green-600 hover:bg-green-700 text-white p-4 rounded-full shadow-lg" onClick={() => setIsAddUserModalOpen(true)}>
                 <FiUserPlus size={24} />
             </button>
-
-            {isAddUserModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-                    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Add New User</h4>
-                        <input type="text" placeholder="Name" className="w-full px-3 py-2 border mb-3" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
-                        <input type="email" placeholder="Email" className="w-full px-3 py-2 border mb-3" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
-                        <input type="password" placeholder="Password" className="w-full px-3 py-2 border mb-3" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
-                        <button className="bg-blue-500 text-white px-4 py-2 rounded-lg" onClick={handleAddUser}>Add User</button>
-                        <button className="mt-4 text-red-500" onClick={() => setIsAddUserModalOpen(false)}>Cancel</button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
