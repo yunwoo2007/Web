@@ -10,8 +10,6 @@ const SUBJECTS = ["1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade
 function UsersPage() {
     const [users, setUsers] = useState(null);
     const [expandedUser, setExpandedUser] = useState(null);
-    const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
     const [selectedUserSubjects, setSelectedUserSubjects] = useState([]);
     const [newUser, setNewUser] = useState({ name: "", email: "", password: "", subjects: [] });
     const listRef = useRef(null);
@@ -51,79 +49,44 @@ function UsersPage() {
                 subjects: newUser.subjects
             });
             setNewUser({ name: "", email: "", password: "", subjects: [] });
-            setIsAddUserModalOpen(false);
         } catch (error) {
             console.error("Error adding user:", error);
             alert(error.message);
         }
     };
 
-    const handleDeleteUser = async (userId) => {
-        try {
-            await deleteDoc(doc(db, "users", userId));
-            const authInstance = getAuth();
-            const user = authInstance.currentUser;
-            if (user && user.uid === userId) {
-                await deleteUser(user);
-            }
-        } catch (error) {
-            console.error("Error deleting user:", error);
-            alert("Failed to delete user.");
-        }
-    };
-
-    const handleEditSubjects = (user) => {
-        setExpandedUser(user.id);
-        setSelectedUserSubjects(user.subjects || []);
-        setIsSubjectModalOpen(true);
-    };
-
-    const handleToggleSubject = async (subject) => {
-        if (!expandedUser) return;
-        const updatedSubjects = selectedUserSubjects.includes(subject)
-            ? selectedUserSubjects.filter(sub => sub !== subject)
-            : [...selectedUserSubjects, subject];
-
-        setSelectedUserSubjects(updatedSubjects);
-        await updateDoc(doc(db, "users", expandedUser), { subjects: updatedSubjects });
+    const handleToggleNewUserSubject = (subject) => {
+        setNewUser((prev) => ({
+            ...prev,
+            subjects: prev.subjects.includes(subject)
+                ? prev.subjects.filter(sub => sub !== subject)
+                : [...prev.subjects, subject]
+        }));
     };
 
     return (
         <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
-            <div className="w-full max-w-6xl overflow-y-auto max-h-96 border p-2" ref={listRef}>
-                {users === null ? (
-                    <p className="text-center py-4">Loading users...</p>
-                ) : (
-                    <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
-                        <thead className="bg-gray-200 text-gray-700 border-b">
-                            <tr>
-                                <th className="px-4 py-3">Name</th>
-                                <th className="px-4 py-3">Email</th>
-                                <th className="px-4 py-3">Subjects</th>
-                                <th className="px-4 py-3">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {users.length > 0 ? users.map((user) => (
-                                <tr key={user.id} className="border-b">
-                                    <td className="px-4 py-3">{user.name}</td>
-                                    <td className="px-4 py-3">{user.email}</td>
-                                    <td className="px-4 py-3">{Array.isArray(user.subjects) ? user.subjects.join(", ") : "No subjects assigned"}</td>
-                                    <td className="px-4 py-3 flex space-x-3">
-                                        <button onClick={() => handleEditSubjects(user)} className="text-blue-600 hover:text-blue-800"><FiEdit /></button>
-                                        <button onClick={() => handleDeleteUser(user.id)} className="text-red-600 hover:text-red-800"><FiTrash /></button>
-                                    </td>
-                                </tr>
-                            )) : <tr><td colSpan="4" className="text-center py-4">No users available</td></tr>}
-                        </tbody>
-                    </table>
-                )}
+            <div className="mb-4 p-4 bg-white shadow-md rounded-lg">
+                <h2 className="text-lg font-semibold">Add New User</h2>
+                <input type="text" placeholder="Name" className="w-full px-3 py-2 border mb-3" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
+                <input type="email" placeholder="Email" className="w-full px-3 py-2 border mb-3" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+                <input type="password" placeholder="Password" className="w-full px-3 py-2 border mb-3" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+                <div className="max-h-40 overflow-y-auto border p-2 mb-3">
+                    {SUBJECTS.map((subject) => (
+                        <label key={subject} className="block">
+                            <input
+                                type="checkbox"
+                                checked={newUser.subjects.includes(subject)}
+                                onChange={() => handleToggleNewUserSubject(subject)}
+                            /> {subject}
+                        </label>
+                    ))}
+                </div>
+                <button className="bg-blue-500 text-white px-4 py-2 rounded-lg" onClick={handleAddUser}>Add User</button>
             </div>
-            <button className="fixed bottom-6 right-6 bg-green-600 hover:bg-green-700 text-white p-4 rounded-full shadow-lg" onClick={() => setIsAddUserModalOpen(true)}>
-                <FiUserPlus size={24} />
-            </button>
         </div>
     );
 }
 
 export default UsersPage;
+
