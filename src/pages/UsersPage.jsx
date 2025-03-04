@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
@@ -25,7 +24,7 @@ function UsersPage() {
     }, []);
 
     const handleDeleteUser = async (userId, userEmail) => {
-        if (!window.confirm("Are you sure you want to delete this user?")) return;
+        if (!window.confirm("정말로 이 사용자를 삭제하시겠습니까?")) return;
         try {
             await deleteDoc(doc(db, "users", userId));
             const userRecord = authInstance.currentUser;
@@ -34,7 +33,7 @@ function UsersPage() {
             }
             setUsers(users.filter(user => user.id !== userId));
         } catch (error) {
-            console.error("Error deleting user:", error);
+            console.error("사용자 삭제 오류:", error);
             alert(error.message);
         }
     };
@@ -62,27 +61,27 @@ function UsersPage() {
     return (
         <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
             <div className="flex justify-between w-full max-w-6xl mb-6">
-                <h2 className="text-3xl font-bold text-gray-800">Manage Users</h2>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md transition" onClick={() => setIsAddUserModalOpen(true)}>+ Add User</button>
+                <h2 className="text-3xl font-bold text-gray-800">사용자 관리</h2>
+                <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md transition" onClick={() => setIsAddUserModalOpen(true)}>+ 사용자 추가</button>
             </div>
 
             <table className="w-full max-w-6xl bg-white shadow-md rounded-lg overflow-hidden border border-red-600">
                 <thead className="bg-gray-200 text-gray-700 border-b border-red-600">
                     <tr>
-                        <th className="px-4 py-3 border-r border-red-600">Role</th>
-                        <th className="px-4 py-3 border-r border-red-600">User Name</th>
-                        <th className="px-4 py-3 border-r border-red-600">Email</th>
-                        <th className="px-4 py-3 border-r border-red-600">Subjects</th>
-                        <th className="px-4 py-3">Actions</th>
+                        <th className="px-4 py-3 border-r border-red-600">역할</th>
+                        <th className="px-4 py-3 border-r border-red-600">사용자 이름</th>
+                        <th className="px-4 py-3 border-r border-red-600">이메일</th>
+                        <th className="px-4 py-3 border-r border-red-600">과목</th>
+                        <th className="px-4 py-3">작업</th>
                     </tr>
                 </thead>
                 <tbody>
                     {users.map((user, index) => (
                         <tr key={user.id} className={`border-b border-red-600 ${index % 2 === 0 ? 'bg-gray-100' : 'bg-white'}`}>
-                            <td className="px-4 py-3 border-r border-red-600">Admin</td>
+                            <td className="px-4 py-3 border-r border-red-600">관리자</td>
                             <td className="px-4 py-3 border-r border-red-600">{user.name}</td>
                             <td className="px-4 py-3 border-r border-red-600">{user.email}</td>
-                            <td className="px-4 py-3 border-r border-red-600">{user.subjects?.join(", ") || "No subjects assigned"}</td>
+                            <td className="px-4 py-3 border-r border-red-600">{user.subjects?.join(", ") || "과목 미지정"}</td>
                             <td className="px-4 py-3">
                                 <button onClick={() => handleDeleteUser(user.id, user.email)} className="mr-2 text-red-600 hover:text-red-800">
                                     <FiTrash2 />
