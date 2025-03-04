@@ -18,11 +18,18 @@ function UsersPage() {
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
-            const updatedUsers = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
-            setUsers(updatedUsers || []);
+            if (!snapshot.empty) {
+                const updatedUsers = snapshot.docs.map((doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                }));
+                setUsers(updatedUsers);
+            } else {
+                setUsers([]);
+            }
+        }, (error) => {
+            console.error("Firestore error:", error);
+            setUsers([]);
         });
         return () => unsubscribe();
     }, []);
@@ -89,11 +96,11 @@ function UsersPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {users.length > 0 ? users.map((user) => (
+                        {Array.isArray(users) && users.length > 0 ? users.map((user) => (
                             <tr key={user.id} className="border-b">
                                 <td className="px-4 py-3">{user.name}</td>
                                 <td className="px-4 py-3">{user.email}</td>
-                                <td className="px-4 py-3">{user.subjects?.join(", ") || "No subjects assigned"}</td>
+                                <td className="px-4 py-3">{Array.isArray(user.subjects) ? user.subjects.join(", ") : "No subjects assigned"}</td>
                                 <td className="px-4 py-3 flex space-x-3">
                                     <button onClick={() => handleEditSubjects(user)} className="text-blue-600 hover:text-blue-800"><FiEdit /></button>
                                     <button onClick={() => handleDeleteUser(user.id)} className="text-red-600 hover:text-red-800"><FiTrash /></button>
