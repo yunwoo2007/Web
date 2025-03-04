@@ -74,32 +74,52 @@ function UsersPage() {
         }
     };
 
+    const handleDeleteUser = async (userId) => {
+        if (!window.confirm("Are you sure you want to delete this user?")) return;
+        try {
+            await deleteDoc(doc(db, "users", userId));
+            const user = auth.currentUser;
+            if (user) await deleteUser(user);
+        } catch (error) {
+            console.error("Error deleting user:", error);
+            alert(error.message);
+        }
+    };
+
     return (
         <div className="p-6">
             <h2 className="text-3xl font-bold">Manage Users</h2>
             <button onClick={() => setIsAddUserModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 mt-4 rounded">+ Add User</button>
-            {isAddUserModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-                    <div className="bg-white p-6 rounded shadow-md w-96">
-                        <h3 className="text-xl font-bold mb-4">Add New User</h3>
-                        <input type="text" placeholder="Enter your name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="w-full mb-2 p-2 border rounded" />
-                        <input type="email" placeholder="Enter your email address" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="w-full mb-2 p-2 border rounded" />
-                        <input type="password" placeholder="Enter your password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className="w-full mb-2 p-2 border rounded" />
-                        {SUBJECTS.map(subject => (
-                            <div key={subject}>
-                                <input type="checkbox" value={subject} onChange={(e) => {
-                                    const updatedSubjects = e.target.checked ? [...newUser.subjects, subject] : newUser.subjects.filter(s => s !== subject);
-                                    setNewUser({ ...newUser, subjects: updatedSubjects });
-                                }} /> {subject}
-                            </div>
-                        ))}
-                        <button onClick={handleAddUser} className="bg-blue-600 text-white px-4 py-2 rounded w-full">Submit</button>
-                    </div>
-                </div>
-            )}
+            <table className="w-full mt-4 border">
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>User Name</th>
+                        <th>Email</th>
+                        <th>Subjects</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {users.map((user) => (
+                        <tr key={user.id}>
+                            <td>Admin</td>
+                            <td>{user.name}</td>
+                            <td>{user.email}</td>
+                            <td>{user.subjects?.join(", ") || "No subjects assigned"}</td>
+                            <td>
+                                <button onClick={() => handleDeleteUser(user.id)}><FiTrash2 /></button>
+                                <button onClick={() => {
+                                    setExpandedUser(user.id);
+                                    setIsSubjectModalOpen(true);
+                                }}><FiEdit /></button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
     );
 }
 export default UsersPage;
-
 
