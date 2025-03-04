@@ -3,7 +3,7 @@ import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
 import { auth } from "../utils/firebase_auth";
 import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
-import { FiEdit, FiTrash2, FiPlus, FiMinus } from "react-icons/fi";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
 
 const SUBJECTS = [
     "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade", "Pre-Kindergarten", "Kindergarten",
@@ -36,6 +36,8 @@ const SUBJECTS = [
 
 function UsersPage() {
     const [users, setUsers] = useState([]);
+    const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+    const [newUser, setNewUser] = useState({ name: "", email: "", password: "", subjects: [] });
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
     const [expandedUser, setExpandedUser] = useState(null);
 
@@ -50,58 +52,48 @@ function UsersPage() {
         return () => unsubscribe();
     }, []);
 
-    const handleToggleSubject = async (subject) => {
-        if (!expandedUser) return;
-        const userRef = doc(db, "users", expandedUser);
-        const user = users.find(u => u.id === expandedUser);
-        if (!user) return;
-        const updatedSubjects = user.subjects?.includes(subject)
-            ? user.subjects.filter(sub => sub !== subject)
-            : [...(user.subjects || []), subject];
-        await updateDoc(userRef, { subjects: updatedSubjects });
+    const handleAddUser = async () => {
+        if (!newUser.name || !newUser.email || !newUser.password) {
+            alert("Please fill all fields!");
+            return;
+        }
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
+            const userId = userCredential.user.uid;
+            await addDoc(collection(db, "users"), {
+                id: userId,
+                name: newUser.name,
+                email: newUser.email,
+                subjects: newUser.subjects,
+            });
+            setNewUser({ name: "", email: "", password: "", subjects: [] });
+            setIsAddUserModalOpen(false);
+        } catch (error) {
+            console.error("Error adding user:", error);
+            alert(error.message);
+        }
     };
 
     return (
         <div className="p-6">
             <h2 className="text-3xl font-bold">Manage Users</h2>
-            <table className="w-full mt-4 border">
-                <thead>
-                    <tr>
-                        <th>Role</th>
-                        <th>User Name</th>
-                        <th>Email</th>
-                        <th>Subjects</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {users.map((user) => (
-                        <tr key={user.id}>
-                            <td>Admin</td>
-                            <td>{user.name}</td>
-                            <td>{user.email}</td>
-                            <td>{user.subjects?.join(", ") || "No subjects assigned"}</td>
-                            <td>
-                                <button onClick={() => {
-                                    setExpandedUser(user.id);
-                                    setIsSubjectModalOpen(true);
-                                }}><FiEdit /></button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            {isSubjectModalOpen && (
+            <button onClick={() => setIsAddUserModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 mt-4 rounded">+ Add User</button>
+            {isAddUserModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
                     <div className="bg-white p-6 rounded shadow-md w-96">
-                        <h3 className="text-xl font-bold mb-4">Modify Subjects</h3>
+                        <h3 className="text-xl font-bold mb-4">Add New User</h3>
+                        <input type="text" placeholder="Enter your name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="w-full mb-2 p-2 border rounded" />
+                        <input type="email" placeholder="Enter your email address" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="w-full mb-2 p-2 border rounded" />
+                        <input type="password" placeholder="Enter your password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className="w-full mb-2 p-2 border rounded" />
                         {SUBJECTS.map(subject => (
                             <div key={subject}>
-                                <input type="checkbox" checked={users.find(u => u.id === expandedUser)?.subjects?.includes(subject) || false}
-                                    onChange={() => handleToggleSubject(subject)} /> {subject}
+                                <input type="checkbox" value={subject} onChange={(e) => {
+                                    const updatedSubjects = e.target.checked ? [...newUser.subjects, subject] : newUser.subjects.filter(s => s !== subject);
+                                    setNewUser({ ...newUser, subjects: updatedSubjects });
+                                }} /> {subject}
                             </div>
                         ))}
-                        <button onClick={() => setIsSubjectModalOpen(false)} className="mt-2 bg-gray-500 text-white px-4 py-2 rounded w-full">Close</button>
+                        <button onClick={handleAddUser} className="bg-blue-600 text-white px-4 py-2 rounded w-full">Submit</button>
                     </div>
                 </div>
             )}
