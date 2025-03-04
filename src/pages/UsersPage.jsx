@@ -1,64 +1,48 @@
 import { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
-import { getAuth, createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import { auth } from "../utils/firebase_auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { FiEdit } from "react-icons/fi";
 
-const auth = getAuth();
-
-const SUBJECTS = ["Math", "Science", "History", "English", "Art", "Music", "Physical Education"];
+const SUBJECTS = ["1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade", "Pre-Kindergarten", "Kindergarten", "6th Grade ELA", "Math 6AB", "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies", "6th Grade Science", "6th Grade Band", "6th Grade Computer Science", "6th Grade Creative Problem Solving", "6th Grade Visual Arts", "6th Grade Physical Education", "6th Grade Orchestra", "Math 6B/7AB", "Math 7AB", "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies", "7th Grade Science", "7th Grade Band", "7th Grade Computer Science", "7th Grade Creative Problem Solving", "7th Grade Visual Arts", "7th Grade Physical Education", "7th Grade Orchestra", "Spanish II(Middle School)"];
 
 function UsersPage() {
     const [users, setUsers] = useState([]);
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-    const [newUser, setNewUser] = useState({ name: "", email: "", password: "", subjects: [] });
-    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
-    const [selectedSubjects, setSelectedSubjects] = useState([]);
-    const [editingUser, setEditingUser] = useState(null);
+    const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
-            const updatedUsers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+            const updatedUsers = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+            }));
             setUsers(updatedUsers);
         });
         return () => unsubscribe();
     }, []);
 
-    const handleDeleteUser = async (userId, userEmail) => {
-        if (!window.confirm("Are you sure you want to delete this user?")) return;
-        try {
-            await deleteDoc(doc(db, "users", userId));
-            const userRecord = auth.currentUser;
-            if (userRecord && userRecord.email === userEmail) {
-                await deleteUser(userRecord);
-            }
-            setUsers(users.filter(user => user.id !== userId));
-        } catch (error) {
-            console.error("Error deleting user:", error);
-            alert(error.message);
-        }
-    };
-
     const handleAddUser = async () => {
+        if (!newUser.name || !newUser.email || !newUser.password) {
+            alert("Please fill all fields!");
+            return;
+        }
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
+            const userId = userCredential.user.uid;
+
             await addDoc(collection(db, "users"), {
+                id: userId,
                 name: newUser.name,
                 email: newUser.email,
-                subjects: newUser.subjects,
+                subject: []
             });
-            setNewUser({ name: "", email: "", password: "", subjects: [] });
+            setNewUser({ name: "", email: "", password: "" });
             setIsAddUserModalOpen(false);
         } catch (error) {
+            console.error("Error adding user:", error);
             alert(error.message);
-        }
-    };
-
-    const handleUpdateSubjects = async () => {
-        if (editingUser) {
-            await updateDoc(doc(db, "users", editingUser.id), { subjects: selectedSubjects });
-            setIsSubjectModalOpen(false);
-            setEditingUser(null);
         }
     };
 
@@ -66,39 +50,54 @@ function UsersPage() {
         <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
             <div className="flex justify-between w-full max-w-6xl mb-6">
                 <h2 className="text-3xl font-bold text-gray-800">Manage Users</h2>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md transition" onClick={() => setIsAddUserModalOpen(true)}>+ Add User</button>
+                <button
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md transition"
+                    onClick={() => setIsAddUserModalOpen(true)}
+                >
+                    + Add User
+                </button>
             </div>
 
-            <table className="w-full max-w-6xl bg-white shadow-md rounded-lg overflow-hidden border border-gray-600">
-                <thead className="bg-gray-200 text-gray-700 border-b border-gray-600">
-                    <tr>
-                        <th className="px-4 py-3 border-r border-gray-600">Name</th>
-                        <th className="px-4 py-3 border-r border-gray-600">Email</th>
-                        <th className="px-4 py-3 border-r border-gray-600">Subjects</th>
-                        <th className="px-4 py-3">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {users.map((user, index) => (
-                        <tr key={user.id} className={`border-b border-gray-600 ${index % 2 === 0 ? 'bg-gray-100' : 'bg-white'}`}>
-                            <td className="px-4 py-3 border-r border-gray-600">{user.name}</td>
-                            <td className="px-4 py-3 border-r border-gray-600">{user.email}</td>
-                            <td className="px-4 py-3 border-r border-gray-600">{user.subjects?.join(", ") || "No subjects assigned"}</td>
-                            <td className="px-4 py-3">
-                                <button onClick={() => handleDeleteUser(user.id, user.email)} className="mr-2 text-red-600 hover:text-red-800">
-                                    <FiTrash2 />
-                                </button>
-                                <button onClick={() => { setEditingUser(user); setSelectedSubjects(user.subjects || []); setIsSubjectModalOpen(true); }}>
-                                    <FiEdit className="text-blue-600 hover:text-blue-800" />
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            {isAddUserModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+                    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Add New User</h4>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">Name</label>
+                            <input
+                                type="text"
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+                                value={newUser.name}
+                                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">Email</label>
+                            <input
+                                type="email"
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+                                value={newUser.email}
+                                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">Password</label>
+                            <input
+                                type="password"
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+                                value={newUser.password}
+                                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                            />
+                        </div>
+                        <button className="bg-blue-500 text-white px-4 py-2 rounded-lg" onClick={handleAddUser}>
+                            Add User
+                        </button>
+                        <button className="mt-4 text-red-500" onClick={() => setIsAddUserModalOpen(false)}>Cancel</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+
 export default UsersPage;
-
-
