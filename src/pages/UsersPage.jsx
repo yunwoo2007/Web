@@ -1,146 +1,209 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
 import { auth } from "../utils/firebase_auth";
-import { createUserWithEmailAndPassword, deleteUser, getAuth } from "firebase/auth";
-import { FiEdit } from "react-icons/fi";
+import { createUserWithEmailAndPassword, updateProfile, deleteUser } from "firebase/auth";
+import { FiEdit, FiTrash } from "react-icons/fi";
 
 const SUBJECTS = [
-  "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade", "Pre-Kindergarten", "Kindergarten",
-  "6th Grade ELA", "Math 6AB", "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies",
-  "6th Grade Science", "6th Grade Band", "6th Grade Computer Science", "6th Grade Creative Problem Solving",
-  "6th Grade Visual Arts", "6th Grade Physical Education", "6th Grade Orchestra", "Math 6B/7AB", "Math 7AB",
-  "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies", "7th Grade Science", "7th Grade Band",
-  "7th Grade Computer Science", "7th Grade Creative Problem Solving", "7th Grade Visual Arts", "7th Grade Physical Education",
-  "7th Grade Orchestra", "Spanish II(Middle School)"
+    "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
+    "Pre-Kindergarten", "Kindergarten", "6th Grade ELA", "Math 6AB",
+    "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies",
+    "6th Grade Science", "6th Grade Band", "6th Grade Computer Science",
+    "6th Grade Creative Problem Solving", "6th Grade Visual Arts",
+    "6th Grade Physical Education", "6th Grade Orchestra", "Math 6B/7AB",
+    "Math 7AB", "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies",
+    "7th Grade Science", "7th Grade Band", "7th Grade Computer Science",
+    "7th Grade Creative Problem Solving", "7th Grade Visual Arts",
+    "7th Grade Physical Education", "7th Grade Orchestra", "Spanish II(Middle School)"
 ];
 
-const LEVELS = {
-  "Elementary School": SUBJECTS.slice(0, 7),
-  "Middle School": SUBJECTS.slice(7, SUBJECTS.length),
-  "High School": [] // Currently empty
-};
+function UsersPage() {
+    const [users, setUsers] = useState([]);
+    const [expandedUser, setExpandedUser] = useState(null);
+    const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+    const [selectedUserSubjects, setSelectedUserSubjects] = useState([]);
+    const [newUser, setNewUser] = useState({ name: "", email: "", password: "", subjects: [] });
+    const listRef = useRef(null);
 
-const AdminPage = () => {
-  const [users, setUsers] = useState([]);
-  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", subject: [] });
-  const [editingUser, setEditingUser] = useState(null);
-  const [updatedSubjects, setUpdatedSubjects] = useState([]);
-  const [openLevel, setOpenLevel] = useState(null);
-  const firebaseAuth = getAuth();
+    useEffect(() => {
+        const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
+            const updatedUsers = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+            }));
+            setUsers(updatedUsers);
+        });
+        return () => unsubscribe();
+    }, []);
 
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
-      setUsers(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsubscribe();
-  }, []);
+    const handleAddUser = async () => {
+        if (!newUser.name || !newUser.email || !newUser.password) {
+            alert("Please fill all fields!");
+            return;
+        }
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, newUser.email, newUser.password);
+            await updateProfile(userCredential.user, { displayName: newUser.name });
+            const userId = userCredential.user.uid;
 
-  const handleAddUser = async () => {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, newUser.email, newUser.password);
-      const uid = userCredential.user.uid;
+            await addDoc(collection(db, "users"), {
+                name: newUser.name,
+                email: newUser.email,
+                uid: userId,
+                subjects: newUser.subjects,
+            });
 
-      await addDoc(collection(db, "users"), {
-        uid,
-        name: newUser.name,
-        email: newUser.email,
-        subject: newUser.subject,
-      });
+            setNewUser({ name: "", email: "", password: "", subjects: [] });
+            setIsAddUserModalOpen(false);
+        } catch (error) {
+            console.error("Error adding user:", error);
+            alert("Failed to add user.");
+        }
+    };
 
-      setNewUser({ name: "", email: "", password: "", subject: [] });
-    } catch (error) {
-      console.error("Error adding user:", error);
-    }
-  };
+    const handleDeleteUser = async (userId) => {
+        try {
+            await deleteDoc(doc(db, "users", userId));
+        } catch (error) {
+            console.error("Error deleting user:", error);
+            alert("Failed to delete user.");
+        }
+    };
 
-  const handleDeleteUser = async (userId, uid) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    const handleEditSubjects = (user) => {
+        setExpandedUser(user.id);
+        setSelectedUserSubjects(user.subjects || []);
+        setIsSubjectModalOpen(true);
+    };
 
-    try {
-      await deleteDoc(doc(db, "users", userId));
-      const userToDelete = auth.currentUser;
-      if (userToDelete && userToDelete.uid === uid) {
-        await deleteUser(userToDelete);
-      }
-      setUsers(users.filter((user) => user.id !== userId));
-    } catch (error) {
-      console.error("Error deleting user:", error);
-    }
-  };
+    const handleToggleSubject = async (subject) => {
+        if (!expandedUser) return;
+        const updatedSubjects = selectedUserSubjects.includes(subject)
+            ? selectedUserSubjects.filter(sub => sub !== subject)
+            : [...selectedUserSubjects, subject];
 
-  const handleToggleLevel = (level) => {
-    setOpenLevel(openLevel === level ? null : level);
-  };
+        setSelectedUserSubjects(updatedSubjects);
+        await updateDoc(doc(db, "users", expandedUser), { subjects: updatedSubjects });
+    };
 
-  const handleCheckboxChange = (subject, checked) => {
-    setUpdatedSubjects((prev) => checked ? [...prev, subject] : prev.filter((s) => s !== subject));
-  };
-
-  const handleSaveSubjects = async () => {
-    if (editingUser) {
-      try {
-        await updateDoc(doc(db, "users", editingUser.id), { subject: updatedSubjects });
-        setEditingUser(null);
-      } catch (error) {
-        console.error("Error updating subjects:", error);
-      }
-    }
-  };
-
-  return (
-    <div>
-      <h1>Admin Page</h1>
-      <h2>Add User</h2>
-      <input type="text" placeholder="Name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
-      <input type="email" placeholder="Email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
-      <input type="password" placeholder="Password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
-      <button onClick={handleAddUser}>Add</button>
-
-      <h2>User List</h2>
-      {users.map((user) => (
-        <div key={user.id} style={{ padding: "10px", border: "1px solid gray", margin: "5px" }}>
-          <p>{user.name} ({user.email})</p>
-          <button onClick={() => handleDeleteUser(user.id, user.uid)}>🗑 Delete</button>
-          <button onClick={() => {
-            setEditingUser(user);
-            setUpdatedSubjects(user.subject || []);
-          }}>
-            <FiEdit />
-          </button>
-        </div>
-      ))}
-
-      {editingUser && (
-        <div style={{ backgroundColor: "white", padding: "20px", borderRadius: "8px", marginTop: "20px" }}>
-          <h2>Edit Subjects for {editingUser.name}</h2>
-          {Object.keys(LEVELS).map((level) => (
-            <div key={level}>
-              <button onClick={() => handleToggleLevel(level)}>{level}</button>
-              {openLevel === level && (
-                <div style={{ marginTop: "10px" }}>
-                  {LEVELS[level].map((subject) => (
-                    <label key={subject} style={{ display: "block" }}>
-                      <input
-                        type="checkbox"
-                        checked={updatedSubjects.includes(subject)}
-                        onChange={(e) => handleCheckboxChange(subject, e.target.checked)}
-                      />
-                      {subject}
-                    </label>
-                  ))}
-                </div>
-              )}
+    return (
+        <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
+            <div className="flex justify-between w-full max-w-6xl mb-6">
+                <h2 className="text-3xl font-bold text-gray-800">Manage Users</h2>
+                <button
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md transition"
+                    onClick={() => setIsAddUserModalOpen(true)}
+                >
+                    + Add User
+                </button>
             </div>
-          ))}
-          <button onClick={handleSaveSubjects}>Save Subjects</button>
-          <button onClick={() => setEditingUser(null)}>Close</button>
+
+            <div className="w-full max-w-6xl overflow-y-auto max-h-96 border p-2" ref={listRef}>
+                <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
+                    <thead className="bg-gray-200 text-gray-700 border-b">
+                        <tr>
+                            <th className="px-4 py-3">Name</th>
+                            <th className="px-4 py-3">Email</th>
+                            <th className="px-4 py-3">Subjects</th>
+                            <th className="px-4 py-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {users.map((user) => (
+                            <tr key={user.id} className="border-b">
+                                <td className="px-4 py-3">{user.name}</td>
+                                <td className="px-4 py-3">{user.email}</td>
+                                <td className="px-4 py-3">{user.subjects?.join(", ") || "No subjects assigned"}</td>
+                                <td className="px-4 py-3 flex space-x-3">
+                                    <button onClick={() => handleEditSubjects(user)} className="text-blue-600 hover:text-blue-800"><FiEdit /></button>
+                                    <button onClick={() => handleDeleteUser(user.id)} className="text-red-600 hover:text-red-800"><FiTrash /></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {isAddUserModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+                    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Add New User</h4>
+                        <input
+                            type="text"
+                            placeholder="Name"
+                            className="w-full px-3 py-2 border mb-3"
+                            value={newUser.name}
+                            onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                        />
+                        <input
+                            type="email"
+                            placeholder="Email"
+                            className="w-full px-3 py-2 border mb-3"
+                            value={newUser.email}
+                            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                        />
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            className="w-full px-3 py-2 border mb-3"
+                            value={newUser.password}
+                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        />
+                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Select Subjects</h4>
+                        <div className="max-h-40 overflow-y-auto border p-2 mb-3">
+                            {SUBJECTS.map((subject) => (
+                                <label key={subject} className="block">
+                                    <input
+                                        type="checkbox"
+                                        checked={newUser.subjects.includes(subject)}
+                                        onChange={() => setNewUser((prev) => ({
+                                            ...prev,
+                                            subjects: prev.subjects.includes(subject)
+                                                ? prev.subjects.filter(sub => sub !== subject)
+                                                : [...prev.subjects, subject]
+                                        }))}
+                                    />{" "}
+                                    {subject}
+                                </label>
+                            ))}
+                        </div>
+                        <button className="bg-blue-500 text-white px-4 py-2 rounded-lg" onClick={handleAddUser}>
+                            Add User
+                        </button>
+                        <button className="mt-4 text-red-500" onClick={() => setIsAddUserModalOpen(false)}>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {isSubjectModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+                    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                        <h4 className="text-lg font-semibold text-gray-700 mb-4">Edit Subjects</h4>
+                        <div className="max-h-40 overflow-y-auto border p-2 mb-3">
+                            {SUBJECTS.map((subject) => (
+                                <label key={subject} className="block">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedUserSubjects.includes(subject)}
+                                        onChange={() => handleToggleSubject(subject)}
+                                    />{" "}
+                                    {subject}
+                                </label>
+                            ))}
+                        </div>
+                        <button className="bg-red-500 text-white px-4 py-2 rounded-lg" onClick={() => setIsSubjectModalOpen(false)}>
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  );
-};
+    );
+}
 
-export default AdminPage;
-
+export default UsersPage;
 
