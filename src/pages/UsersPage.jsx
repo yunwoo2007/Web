@@ -1,258 +1,447 @@
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
-import {
-  collection,
-  onSnapshot,
-  deleteDoc,
-  doc,
-  addDoc,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { auth } from "../utils/firebase_auth";
-import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from "firebase/auth";
-import { FiEdit, FiTrash } from "react-icons/fi";
+import { createUserWithEmailAndPassword, deleteUser, getAuth } from "firebase/auth";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCog } from '@fortawesome/free-solid-svg-icons';
+import { driveLink } from "../utils/f_config";
+import { useNavigate } from "react-router-dom";
 
-const SUBJECTS = [
-  "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
-  "Pre-Kindergarten", "Kindergarten", "6th Grade ELA", "Math 6AB",
-  "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies",
-  "6th Grade Science", "6th Grade Band", "6th Grade Computer Science",
-  "6th Grade Creative Problem Solving", "6th Grade Visual Arts",
-  "6th Grade Physical Education", "6th Grade Orchestra", "Math 6B/7AB",
-  "Math 7AB", "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies",
-  "7th Grade Science", "7th Grade Band", "7th Grade Computer Science",
-  "7th Grade Creative Problem Solving", "7th Grade Visual Arts",
-  "7th Grade Physical Education", "7th Grade Orchestra", "Spanish II(Middle School)"
-];
+const SUBJECTS = {
+  "Elementary School": [
+    "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
+    "Kindergarten", "Pre-Kindergarten"
+  ].sort(),
+  "Middle School": [
+    "6th Grade Band", "6th Grade Computer Science", "6th Grade Creative Problem Solving",
+    "6th Grade ELA", "6th Grade Physical Education", "6th Grade Science",
+    "6th Grade Social Studies", "6th Grade Visual Arts", "Introduction to World Languages",
+    "Math 6AB", "Math 6B/7AB", "Math 7AB", "Math 8AB", "Spanish 6", "Spanish I",
+    "Spanish II", "7th Grade Band", "7th Grade Computer Science",
+    "7th Grade Creative Problem Solving", "7th Grade ELA", "7th Grade Orchestra",
+    "7th Grade Physical Education", "7th Grade Science", "7th Grade Social Studies",
+    "7th Grade Visual Arts", "8th Grade Band", "8th Grade Computer Science",
+    "8th Grade Creative Problem Solving", "8th Grade ELA", "8th Grade Orchestra",
+    "8th Grade Physical Education", "8th Grade Science", "8th Grade Social Studies",
+    "8th Grade Visual Arts", "Enhanced Algebra: Concepts and Connections"
+  ].sort(),
+  "High School": {
+    "Math": ["Algebra: Concepts and Connections", "AP Calculus AB", "AP Calculus BC", "AP Precalculus", "AP Statistics", "Geometry: Concepts and Connections", "Multivariable Calculus", "Precalculus", "Statistics"].sort(),
+    "Science": ["AP Biology", "AP Chemistry", "AP Environmental Science", "AP Physics C", "AP Physics I", "Biology", "Chemistry", "Forensics", "Human Anatomy & Physiology", "Physics I"].sort(),
+    "English": ["Advanced Composition", "American Literature", "AP Language and Composition", "AP Literature and Composition", "British Literature and Composition", "World Literature"].sort(),
+    "Social Studies": ["AP Human Geography", "AP Macroeconomics", "AP Psychology", "AP U.S. Government and Politics", "AP U.S. History", "AP World History", "U.S. History", "World History"].sort(),
+    "Electives": ["AP Art and Design", "AP Music Theory", "Band", "Drama", "Orchestra", "Scientific Illustration", "Spanish I", "Spanish II", "Spanish III", "Spanish IV", "Turkish I", "Turkish II", "Turkish III", "Turkish IV"].sort()
+  }
+};
 
-function UsersPage() {
+const AdminPage = () => {
   const [users, setUsers] = useState([]);
-  const [expandedUser, setExpandedUser] = useState(null);
-  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
-  const [selectedUserSubjects, setSelectedUserSubjects] = useState([]);
-  const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    password: "",
-    subjects: [],
-  });
-  const listRef = useRef(null);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newUser, setNewUser] = useState({ firstName: "", lastName: "", email: "", password: "FSA123", subject: [], role: "", gradeLevel: "", courseCategory: "" });
+  const [editingUser, setEditingUser] = useState(null);
+  const [updatedUser, setUpdatedUser] = useState({ firstName: "", lastName: "", email: "", password: "", subject: [], role: "", gradeLevel: "", courseCategory: "" });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const firebaseAuth = getAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
-      const updatedUsers = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.name || "",
-          email: data.email || "",
-          subjects: Array.isArray(data.subjects) ? data.subjects : [],
-        };
-      });
-      setUsers(updatedUsers);
+      const allUsers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setUsers(allUsers);
+      setFilteredUsers(allUsers);
     });
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    const results = users.filter(user =>
+      (user.firstName?.toLowerCase().includes(lowerCaseQuery) ||
+        user.lastName?.toLowerCase().includes(lowerCaseQuery) ||
+        user.email?.toLowerCase().includes(lowerCaseQuery))
+    );
+    setFilteredUsers(results);
+  }, [searchQuery, users]);
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleOpenAddModal = () => {
+    setIsAddModalOpen(true);
+    setNewUser({ firstName: "", lastName: "", email: "", password: "FSA123", subject: [], role: "", gradeLevel: "", courseCategory: "" });
+  };
+
+  const handleCloseAddModal = () => {
+    setIsAddModalOpen(false);
+    setNewUser({ firstName: "", lastName: "", email: "", password: "FSA123", subject: [], role: "", gradeLevel: "", courseCategory: "" });
+  };
+
   const handleAddUser = async () => {
-    if (!newUser.name || !newUser.email || !newUser.password) {
-      alert("Please fill all fields!");
-      return;
-    }
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        newUser.email,
-        newUser.password
-      );
-      await updateProfile(userCredential.user, { displayName: newUser.name });
-
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, newUser.email, newUser.password);
+      const uid = userCredential.user.uid;
       await addDoc(collection(db, "users"), {
-        id: userCredential.user.uid,
-        name: newUser.name,
+        uid,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
         email: newUser.email,
-        subjects: newUser.subjects,
+        password: newUser.password,
+        subject: newUser.role === 'admin' ? ["Full Drive"] : newUser.subject,
+        role: newUser.role || 'teacher',
+        authProvider: "admin",
+        createdAt: serverTimestamp(),
+        gradeLevel: newUser.gradeLevel,
+        courseCategory: newUser.courseCategory,
       });
-
-      setNewUser({ name: "", email: "", password: "", subjects: [] });
-      setIsAddUserModalOpen(false);
+      handleCloseAddModal();
     } catch (error) {
       console.error("Error adding user:", error);
-      alert(error.message);
+      alert(`Error adding user: ${error.message}`);
     }
   };
 
-  const handleDeleteUser = async (userId) => {
+  const handleDeleteUser = async (userId, uid) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
       await deleteDoc(doc(db, "users", userId));
+      const currentUser = auth.currentUser;
+      if (currentUser && currentUser.uid === uid) {
+        await deleteUser(currentUser);
+        navigate('/login'); // Redirect to login after deleting current user
+      }
+      setUsers(users.filter((user) => user.id !== userId));
+      setFilteredUsers(filteredUsers.filter((user) => user.id !== userId));
     } catch (error) {
       console.error("Error deleting user:", error);
-      alert("Failed to delete user.");
+      alert(`Error deleting user: ${error.message}`);
     }
   };
 
-  const handleEditSubjects = (user) => {
-    setExpandedUser(user.id);
-    setSelectedUserSubjects(user.subjects || []);
-    setIsSubjectModalOpen(true);
+  const handleEditUser = (user) => {
+    setEditingUser(user);
+    setUpdatedUser({
+      ...user,
+      role: user.role || 'teacher',
+      subject: user.subject || [],
+      gradeLevel: user.gradeLevel || "",
+      courseCategory: user.courseCategory || ""
+    });
+    setIsModalOpen(true);
   };
 
-  const handleToggleSubject = async (subject) => {
-    if (isSubjectModalOpen) {
-      const updatedSubjects = selectedUserSubjects.includes(subject)
-        ? selectedUserSubjects.filter((s) => s !== subject)
-        : [...selectedUserSubjects, subject];
+  const handleSaveUser = async () => {
+    try {
+      await updateDoc(doc(db, "users", editingUser.id), {
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        subject: updatedUser.role === 'admin' ? ["Full Drive"] : updatedUser.subject,
+        role: updatedUser.role || 'teacher',
+        gradeLevel: updatedUser.gradeLevel,
+        courseCategory: updatedUser.courseCategory,
+      });
+      setIsModalOpen(false);
+      setEditingUser(null);
+    } catch (error) {
+      console.error("Error saving user:", error);
+      alert(`Error saving user: ${error.message}`);
+    }
+  };
 
-      setSelectedUserSubjects(updatedSubjects);
-      if (expandedUser) {
-        await updateDoc(doc(db, "users", expandedUser), {
-          subjects: updatedSubjects,
-        });
-      }
+  const handleResetPassword = async (userId) => {
+    if (!window.confirm("Are you sure you want to reset this user's password to the default?")) return;
+    try {
+      await updateDoc(doc(db, "users", userId), {
+        password: "FSA123",
+      });
+      alert("Password reset successfully.");
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      alert(`Error resetting password: ${error.message}`);
+    }
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setEditingUser(null);
+    setUpdatedUser({ firstName: "", lastName: "", email: "", password: "", subject: [], role: "", gradeLevel: "", courseCategory: "" });
+  };
+
+  const handleGradeLevelChange = (e, isNew = false) => {
+    const value = e.target.value;
+    if (isNew) {
+      setNewUser(prev => ({ ...prev, gradeLevel: value, courseCategory: "", subject: [] }));
     } else {
-      // For new user creation
-      setNewUser((prev) => ({
-        ...prev,
-        subjects: prev.subjects.includes(subject)
-          ? prev.subjects.filter((s) => s !== subject)
-          : [...prev.subjects, subject],
-      }));
+      setUpdatedUser(prev => ({ ...prev, gradeLevel: value, courseCategory: "", subject: [] }));
     }
+  };
+
+  const handleCourseCategoryChange = (e, isNew = false) => {
+    const value = e.target.value;
+    if (isNew) {
+      setNewUser(prev => ({ ...prev, courseCategory: value, subject: [] }));
+    } else {
+      setUpdatedUser(prev => ({ ...prev, courseCategory: value, subject: [] }));
+    }
+  };
+
+  const handleSubjectChange = (e, isNew = false) => {
+    const { value, checked } = e.target;
+    if (isNew) {
+      setNewUser(prev => {
+        const updatedSubjects = checked
+          ? [...prev.subject, value]
+          : prev.subject.filter(subject => subject !== value);
+        return { ...prev, subject: updatedSubjects };
+      });
+    } else {
+      setUpdatedUser(prev => {
+        const updatedSubjects = checked
+          ? [...prev.subject, value]
+          : prev.subject.filter(subject => subject !== value);
+        return { ...prev, subject: updatedSubjects };
+      });
+    }
+  };
+
+  const getAvailableSubjects = (gradeLevel, courseCategory) => {
+    if (gradeLevel === "High School" && courseCategory) {
+      return SUBJECTS["High School"][courseCategory] || [];
+    }
+    return SUBJECTS[gradeLevel] || [];
+  };
+
+  const renderSubjectsByGradeLevel = (gradeLevel, courseCategory, selectedSubjects, onChange) => {
+    const availableSubjects = getAvailableSubjects(gradeLevel, courseCategory);
+    const isAdminRole = isAddModalOpen ? newUser.role === 'admin' : updatedUser.role === 'admin';
+
+    if (isAdminRole) {
+      return null;
+    }
+
+    return (
+      <div>
+        {gradeLevel === "High School" && (
+          <div>
+            <label>Select Course Category</label>
+            <select
+              value={courseCategory || ""}
+              onChange={(e) => {
+                const newCategory = e.target.value;
+                if (isAddModalOpen) {
+                  setNewUser(prev => ({ ...prev, courseCategory: newCategory, subject: [] }));
+                } else {
+                  setUpdatedUser(prev => ({ ...prev, courseCategory: newCategory, subject: [] }));
+                }
+              }}
+            >
+              <option value="">Select Category</option>
+              {Object.keys(SUBJECTS["High School"]).map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {availableSubjects.length > 0 && (
+          <div>
+            <label>Choose your Subjects</label>
+            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #ccc', padding: '5px' }}>
+              {availableSubjects.map((subject) => (
+                <div key={subject}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      value={subject}
+                      checked={selectedSubjects?.includes(subject) || false}
+                      onChange={onChange}
+                    />
+                    {subject}
+                  </label>
+                </div>
+              ))}
+              {(isAddModalOpen ? newUser.subject : updatedUser.subject)
+                ?.filter(subject => !availableSubjects.includes(subject))
+                ?.map(subject => (
+                  <div key={subject}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        value={subject}
+                        checked={selectedSubjects?.includes(subject) || false}
+                        onChange={onChange}
+                      />
+                      {subject} <span style={{ fontStyle: 'italic', color: 'gray' }}>(Other)</span>
+                    </label>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+        {availableSubjects.length === 0 && gradeLevel !== 'High School' && (
+          <div>
+            <label>Choose your Subjects</label>
+            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #ccc', padding: '5px' }}>
+              {(isAddModalOpen ? newUser.subject : updatedUser.subject)?.map(subject => (
+                <div key={subject}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      value={subject}
+                      checked={selectedSubjects?.includes(subject) || false}
+                      onChange={onChange}
+                    />
+                    {subject} <span style={{ fontStyle: 'italic', color: 'gray' }}>(Other)</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+            {(isAddModalOpen ? newUser.subject : updatedUser.subject)?.length === 0 && <p>No subjects available for this grade level.</p>}
+          </div>
+        )}
+        {!gradeLevel && <p>Choose your subjects after selecting a grade level.</p>}
+      </div>
+    );
+  };
+
+  const handleRoleChangeNew = (e) => {
+    const role = e.target.value;
+    setNewUser(prev => ({ ...prev, role, subject: role === 'admin' ? ["Full Drive"] : [], gradeLevel: "", courseCategory: "" }));
+  };
+
+  const handleRoleChangeEdit = (e) => {
+    const role = e.target.value;
+    setUpdatedUser(prev => ({ ...prev, role, subject: role === 'admin' ? ["Full Drive"] : [], gradeLevel: "", courseCategory: "" }));
   };
 
   return (
-    <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
-      <div className="flex justify-between w-full max-w-6xl mb-6">
-        <h2 className="text-3xl font-bold text-gray-800">Manage Users</h2>
-        <button
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md transition"
-          onClick={() => setIsAddUserModalOpen(true)}
-        >
-          + Add User
-        </button>
+    <div>
+      <h1>Admin Page</h1>
+
+      <div style={{ marginBottom: '15px' }}>
+        <input
+          type="text"
+          placeholder="Search users by name or email"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '300px' }}
+        />
       </div>
 
-      <div className="w-full max-w-6xl overflow-y-auto max-h-96 border p-2" ref={listRef}>
-        <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
-          <thead className="bg-gray-200 text-gray-700 border-b">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Subjects</th>
-              <th className="px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="border-b">
-                <td className="px-4 py-3">{user.name}</td>
-                <td className="px-4 py-3">{user.email}</td>
-                <td className="px-4 py-3">
-                  {Array.isArray(user.subjects) && user.subjects.length > 0
-                    ? user.subjects.join(", ")
-                    : "No subjects assigned"}
-                </td>
-                <td className="px-4 py-3 flex space-x-3">
-                  <button
-                    onClick={() => handleEditSubjects(user)}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    <FiEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(user.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <FiTrash />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <button onClick={handleOpenAddModal}>Add User</button>
 
-      {/* Add User Modal */}
-      {isAddUserModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h4 className="text-lg font-semibold text-gray-700 mb-4">Add New User</h4>
-            <input
-              type="text"
-              placeholder="Name"
-              className="w-full px-3 py-2 border mb-3"
-              value={newUser.name}
-              onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              className="w-full px-3 py-2 border mb-3"
-              value={newUser.email}
-              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              className="w-full px-3 py-2 border mb-3"
-              value={newUser.password}
-              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-            />
-            <div className="max-h-40 overflow-y-auto border p-2 mb-3">
-              {SUBJECTS.map((subject) => (
-                <label key={subject} className="block">
-                  <input
-                    type="checkbox"
-                    checked={newUser.subjects.includes(subject)}
-                    onChange={() => handleToggleSubject(subject)}
-                  />{" "}
-                  {subject}
-                </label>
-              ))}
-            </div>
-            <button className="bg-blue-500 text-white px-4 py-2 rounded-lg" onClick={handleAddUser}>
-              Add User
-            </button>
-            <button className="mt-4 text-red-500" onClick={() => setIsAddUserModalOpen(false)}>
-              Cancel
-            </button>
+      {isAddModalOpen && (
+        <div className="modal" style={modalStyle}>
+          <div className="modal-content" style={modalContentStyle}>
+            <h2>Add New User</h2>
+            <input type="text" placeholder="First Name" value={newUser.firstName} onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })} />
+            <input type="text" placeholder="Last Name" value={newUser.lastName} onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })} />
+            <input type="email" placeholder="Email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+            <select value={newUser.role} onChange={handleRoleChangeNew}>
+              <option value="">Choose your role</option>
+              <option value="teacher">Teacher</option>
+              <option value="admin">Admin</option>
+            </select>
+            {newUser.role === 'teacher' && (
+              <>
+                <select value={newUser.gradeLevel} onChange={(e) => handleGradeLevelChange(e, true)}>
+                  <option value="">Choose Subjects</option>
+                  <option value="Elementary School">Elementary School</option>
+                  <option value="Middle School">Middle School</option>
+                  <option value="High School">High School</option>
+                </select>
+                {newUser.gradeLevel && renderSubjectsByGradeLevel(newUser.gradeLevel, newUser.courseCategory, newUser.subject, (e) => handleSubjectChange(e, true))}
+                {!newUser.gradeLevel && <p>Choose your subjects after selecting a grade level.</p>}
+              </>
+            )}
+            <button onClick={handleAddUser}>Add</button>
+            <button onClick={handleCloseAddModal}>Cancel</button>
           </div>
         </div>
       )}
 
-      {/* Edit Subjects Modal */}
-      {isSubjectModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h4 className="text-lg font-semibold text-gray-700 mb-4">Edit Subjects</h4>
-            <div className="max-h-40 overflow-y-auto border p-2 mb-3">
-              {SUBJECTS.map((subject) => (
-                <label key={subject} className="block">
-                  <input
-                    type="checkbox"
-                    checked={selectedUserSubjects.includes(subject)}
-                    onChange={() => handleToggleSubject(subject)}
-                  />{" "}
-                  {subject}
-                </label>
-              ))}
-            </div>
-            <button
-              className="bg-red-500 text-white px-4 py-2 rounded-lg"
-              onClick={() => setIsSubjectModalOpen(false)}
-            >
-              Close
-            </button>
+      <h2>User List</h2>
+      <table border="1" width="100%" style={{ borderCollapse: "collapse", textAlign: "left" }}>
+        <thead>
+          <tr>
+            <th style={{ textAlign: 'center' }}>First Name</th>
+            <th style={{ textAlign: 'center' }}>Last Name</th>
+            <th style={{ textAlign: 'center' }}>Email</th>
+            <th style={{ textAlign: 'center' }}>Role</th>
+            <th style={{ textAlign: 'center' }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredUsers.map((user) => (
+            <tr key={user.id}>
+              <td>{user.firstName || 'N/A'}</td>
+              <td>{user.lastName || 'N/A'}</td>
+              <td>{user.email || 'N/A'}</td>
+              <td>{user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'N/A'}</td>
+              <td>
+                <button onClick={() => handleEditUser(user)}>Edit</button>
+                <button onClick={() => handleResetPassword(user.id)}>Reset Password</button>
+                <button onClick={() => handleDeleteUser(user.id, user.uid)} style={{ color: 'red', fontWeight: 'bold' }}>X</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {isModalOpen && (
+        <div className="modal" style={modalStyle}>
+          <div className="modal-content" style={modalContentStyle}>
+            <h2>Edit User</h2>
+            <input type="text" placeholder="First Name" value={updatedUser.firstName} onChange={(e) => setUpdatedUser({ ...updatedUser, firstName: e.target.value })} />
+            <input type="text" placeholder="Last Name" value={updatedUser.lastName} onChange={(e) => setUpdatedUser({ ...updatedUser, lastName: e.target.value })} />
+            <input type="email" placeholder="Email" value={updatedUser.email} onChange={(e) => setUpdatedUser({ ...updatedUser, email: e.target.value })} />
+            <select value={updatedUser.role} onChange={handleRoleChangeEdit}>
+              <option value="">Choose your role</option>
+              <option value="teacher">Teacher</option>
+              <option value="admin">Admin</option>
+            </select>
+            {updatedUser.role === 'teacher' && (
+              <>
+                <select value={updatedUser.gradeLevel} onChange={handleGradeLevelChange}>
+                  <option value="">Choose Subjects</option>
+                  <option value="Elementary School">Elementary School</option>
+                  <option value="Middle School">Middle School</option>
+                  <option value="High School">High School</option>
+                </select>
+                {updatedUser.gradeLevel && renderSubjectsByGradeLevel(updatedUser.gradeLevel, updatedUser.courseCategory, updatedUser.subject, handleSubjectChange)}
+                {!updatedUser.gradeLevel && <p>Choose your subjects after selecting a grade level.</p>}
+              </>
+            )}
+            <button onClick={handleSaveUser}>Save</button>
+            <button onClick={handleModalClose}>Cancel</button>
           </div>
         </div>
       )}
     </div>
   );
-}
+};
 
-export default UsersPage;
+const modalStyle = {
+  position: 'fixed',
+  top: '0',
+  left: '0',
+  width: '100%',
+  height: '100%',
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+};
 
+const modalContentStyle = {
+  backgroundColor: 'white',
+  padding: '20px',
+  borderRadius: '8px',
+  width: '400px',
+};
+
+export default AdminPage;
