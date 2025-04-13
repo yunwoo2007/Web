@@ -1,28 +1,47 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
 import {
-  collection, onSnapshot, addDoc, serverTimestamp
+  collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc, serverTimestamp
 } from "firebase/firestore";
+import { auth } from "../utils/firebase_auth";
 import {
-  createUserWithEmailAndPassword, getAuth
+  createUserWithEmailAndPassword, deleteUser, getAuth
 } from "firebase/auth";
-import dynamic from 'next/dynamic';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCog } from '@fortawesome/free-solid-svg-icons';
+import { driveLink } from "../utils/f_config";
+import { useNavigate } from "react-router-dom";
+import Papa from "papaparse";
 
-// Dynamically import papaparse for SSR compatibility
-const Papa = dynamic(() => import('papaparse'), { ssr: false });
-
-const AdminPageWithCSVUpload = () => {
+const AdminPage = () => {
   const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const firebaseAuth = getAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
       const allUsers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setUsers(allUsers);
+      setFilteredUsers(allUsers);
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    const results = users.filter(user =>
+      (user.firstName?.toLowerCase().includes(lowerCaseQuery) ||
+        user.lastName?.toLowerCase().includes(lowerCaseQuery) ||
+        user.email?.toLowerCase().includes(lowerCaseQuery))
+    );
+    setFilteredUsers(results);
+  }, [searchQuery, users]);
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
 
   const handleCSVUpload = (e) => {
     const file = e.target.files[0];
@@ -35,7 +54,6 @@ const AdminPageWithCSVUpload = () => {
     reader.onload = async ({ target }) => {
       const csv = target.result;
       const { data: rows } = Papa.parse(csv.trim(), { skipEmptyLines: true });
-
       let errorMessages = [];
 
       for (let i = 0; i < rows.length; i++) {
@@ -50,7 +68,7 @@ const AdminPageWithCSVUpload = () => {
           continue;
         }
         if (!/^[\w.-]+@gmail\.com$/.test(email)) {
-          errorMessages.push(`Row ${i + 1}: Invalid email format. Only @gmail.com allowed.`);
+          errorMessages.push(`Row ${i + 1}: Invalid email format.`);
           continue;
         }
         if (role !== 'Teacher' && role !== 'Admin') {
@@ -87,47 +105,52 @@ const AdminPageWithCSVUpload = () => {
     reader.readAsText(file);
   };
 
-  const filteredUsers = users.filter(user =>
-    user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Admin Page - CSV Upload</h1>
-      <input
-        type="text"
-        placeholder="Search users by name or email"
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        style={{ padding: '8px', marginRight: '15px' }}
-      />
-      <label style={{ backgroundColor: '#eee', padding: '8px', borderRadius: '5px', cursor: 'pointer' }}>
-        Upload CSV
+    <div>
+      <h1>Admin Page</h1>
+
+      <div style={{ marginBottom: '15px' }}>
         <input
-          type="file"
-          accept=".csv"
-          onChange={handleCSVUpload}
-          style={{ display: 'none' }}
+          type="text"
+          placeholder="Search users by name or email"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '300px' }}
         />
-      </label>
-      <table border="1" cellPadding="8" style={{ marginTop: '20px', width: '100%' }}>
+        <label style={{ marginLeft: '10px', padding: '8px', backgroundColor: '#eee', borderRadius: '5px', cursor: 'pointer' }}>
+          Upload CSV
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleCSVUpload}
+            style={{ display: 'none' }}
+          />
+        </label>
+      </div>
+
+      <h2>User List</h2>
+      <table border="1" width="100%" style={{ borderCollapse: "collapse", textAlign: "left" }}>
         <thead>
           <tr>
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>Email</th>
-            <th>Role</th>
+            <th style={{ textAlign: 'center' }}>First Name</th>
+            <th style={{ textAlign: 'center' }}>Last Name</th>
+            <th style={{ textAlign: 'center' }}>Email</th>
+            <th style={{ textAlign: 'center' }}>Role</th>
+            <th style={{ textAlign: 'center' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {filteredUsers.map((user) => (
             <tr key={user.id}>
-              <td>{user.firstName}</td>
-              <td>{user.lastName}</td>
-              <td>{user.email}</td>
-              <td>{user.role}</td>
+              <td>{user.firstName || 'N/A'}</td>
+              <td>{user.lastName || 'N/A'}</td>
+              <td>{user.email || 'N/A'}</td>
+              <td>{user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'N/A'}</td>
+              <td>
+                <button onClick={() => console.log("Edit", user)}>Edit</button>
+                <button onClick={() => console.log("Reset Password", user)}>Reset</button>
+                <button onClick={() => console.log("Delete", user.id)} style={{ color: 'red', fontWeight: 'bold' }}>X</button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -136,4 +159,4 @@ const AdminPageWithCSVUpload = () => {
   );
 };
 
-export default AdminPageWithCSVUpload;
+export default AdminPage;
