@@ -17,7 +17,6 @@ const AdminPage = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const firebaseAuth = getAuth();
   const navigate = useNavigate();
 
@@ -47,7 +46,7 @@ const AdminPage = () => {
   const handleCSVUpload = (e) => {
     const file = e.target.files[0];
     if (!file || file.type !== "text/csv") {
-      alert("CSV 파일만 업로드 가능합니다.");
+      alert("Only CSV files are allowed.");
       return;
     }
     Papa.parse(file, {
@@ -58,20 +57,20 @@ const AdminPage = () => {
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i];
           if (row.length !== 4) {
-            errorMessages.push(`${i + 1}번째 행: 컬럼 수가 올바르지 않습니다.`);
+            errorMessages.push(`Row ${i + 1}: Invalid number of columns.`);
             continue;
           }
           const [firstName, lastName, email, role] = row.map(cell => cell?.trim());
           if (!firstName || !lastName || !email || !role) {
-            errorMessages.push(`${i + 1}번째 행: 빈 칸이 존재합니다.`);
+            errorMessages.push(`Row ${i + 1}: One or more fields are empty.`);
             continue;
           }
           if (!/^[\w.-]+@gmail\.com$/.test(email)) {
-            errorMessages.push(`${i + 1}번째 행: 이메일 형식이 올바르지 않습니다.`);
+            errorMessages.push(`Row ${i + 1}: Invalid email format. Only @gmail.com allowed.`);
             continue;
           }
           if (role !== 'Teacher' && role !== 'Admin') {
-            errorMessages.push(`${i + 1}번째 행: role은 Teacher 또는 Admin이어야 합니다.`);
+            errorMessages.push(`Row ${i + 1}: Role must be either 'Teacher' or 'Admin'.`);
             continue;
           }
           try {
@@ -91,14 +90,14 @@ const AdminPage = () => {
               courseCategory: "",
             });
           } catch (err) {
-            errorMessages.push(`${i + 1}번째 행: Firebase 사용자 생성 실패 - ${err.message}`);
+            errorMessages.push(`Row ${i + 1}: Firebase Auth creation failed - ${err.message}`);
           }
         }
 
         if (errorMessages.length > 0) {
-          alert("업로드 중 다음과 같은 오류가 발생했습니다:\n" + errorMessages.join("\n"));
+          alert("Errors occurred during upload:\n" + errorMessages.join("\n"));
         } else {
-          alert("모든 유저가 성공적으로 업로드되었습니다.");
+          alert("All users uploaded successfully.");
         }
       }
     });
@@ -115,12 +114,15 @@ const AdminPage = () => {
           onChange={handleSearchChange}
           style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '300px' }}
         />
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleCSVUpload}
-          style={{ marginLeft: '20px' }}
-        />
+        <label style={{ marginLeft: '20px', padding: '8px', backgroundColor: '#eee', borderRadius: '5px', cursor: 'pointer' }}>
+          CSV Bulk Upload
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleCSVUpload}
+            style={{ display: 'none' }}
+          />
+        </label>
       </div>
 
       <h2>User List</h2>
@@ -149,4 +151,5 @@ const AdminPage = () => {
 };
 
 export default AdminPage;
+
 
