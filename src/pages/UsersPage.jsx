@@ -6,7 +6,10 @@ import {
 import {
   createUserWithEmailAndPassword, getAuth
 } from "firebase/auth";
-import Papa from "papaparse";
+import dynamic from 'next/dynamic';
+
+// Dynamically import papaparse for SSR compatibility
+const Papa = dynamic(() => import('papaparse'), { ssr: false });
 
 const AdminPageWithCSVUpload = () => {
   const [users, setUsers] = useState([]);
@@ -27,58 +30,61 @@ const AdminPageWithCSVUpload = () => {
       alert("Only CSV files are allowed.");
       return;
     }
-    Papa.parse(file, {
-      complete: async function(results) {
-        const rows = results.data;
-        let errorMessages = [];
 
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
-          if (row.length !== 4) {
-            errorMessages.push(`Row ${i + 1}: Invalid number of columns.`);
-            continue;
-          }
-          const [firstName, lastName, email, role] = row.map(cell => cell?.trim());
-          if (!firstName || !lastName || !email || !role) {
-            errorMessages.push(`Row ${i + 1}: One or more fields are empty.`);
-            continue;
-          }
-          if (!/^[\w.-]+@gmail\.com$/.test(email)) {
-            errorMessages.push(`Row ${i + 1}: Invalid email format. Only @gmail.com allowed.`);
-            continue;
-          }
-          if (role !== 'Teacher' && role !== 'Admin') {
-            errorMessages.push(`Row ${i + 1}: Role must be either 'Teacher' or 'Admin'.`);
-            continue;
-          }
-          try {
-            const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, "FSA123");
-            const uid = userCredential.user.uid;
-            await addDoc(collection(db, "users"), {
-              uid,
-              firstName,
-              lastName,
-              email,
-              password: "FSA123",
-              subject: role === 'Admin' ? ["Full Drive"] : [],
-              role,
-              authProvider: "admin",
-              createdAt: serverTimestamp(),
-              gradeLevel: "",
-              courseCategory: "",
-            });
-          } catch (err) {
-            errorMessages.push(`Row ${i + 1}: Firebase Auth creation failed - ${err.message}`);
-          }
+    const reader = new FileReader();
+    reader.onload = async ({ target }) => {
+      const csv = target.result;
+      const { data: rows } = Papa.parse(csv.trim(), { skipEmptyLines: true });
+
+      let errorMessages = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.length !== 4) {
+          errorMessages.push(`Row ${i + 1}: Invalid number of columns.`);
+          continue;
         }
-
-        if (errorMessages.length > 0) {
-          alert("Errors occurred during upload:\n" + errorMessages.join("\n"));
-        } else {
-          alert("All users uploaded successfully.");
+        const [firstName, lastName, email, role] = row.map(cell => cell?.trim());
+        if (!firstName || !lastName || !email || !role) {
+          errorMessages.push(`Row ${i + 1}: One or more fields are empty.`);
+          continue;
+        }
+        if (!/^[\w.-]+@gmail\.com$/.test(email)) {
+          errorMessages.push(`Row ${i + 1}: Invalid email format. Only @gmail.com allowed.`);
+          continue;
+        }
+        if (role !== 'Teacher' && role !== 'Admin') {
+          errorMessages.push(`Row ${i + 1}: Role must be either 'Teacher' or 'Admin'.`);
+          continue;
+        }
+        try {
+          const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, "FSA123");
+          const uid = userCredential.user.uid;
+          await addDoc(collection(db, "users"), {
+            uid,
+            firstName,
+            lastName,
+            email,
+            password: "FSA123",
+            subject: role === 'Admin' ? ["Full Drive"] : [],
+            role,
+            authProvider: "admin",
+            createdAt: serverTimestamp(),
+            gradeLevel: "",
+            courseCategory: "",
+          });
+        } catch (err) {
+          errorMessages.push(`Row ${i + 1}: Firebase Auth creation failed - ${err.message}`);
         }
       }
-    });
+
+      if (errorMessages.length > 0) {
+        alert("Errors occurred during upload:\n" + errorMessages.join("\n"));
+      } else {
+        alert("All users uploaded successfully.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const filteredUsers = users.filter(user =>
@@ -131,5 +137,3 @@ const AdminPageWithCSVUpload = () => {
 };
 
 export default AdminPageWithCSVUpload;
-
-
