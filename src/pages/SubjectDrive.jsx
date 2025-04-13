@@ -9,6 +9,7 @@ const SubjectDrive = () => {
     const [localSubject, setLocalSubject] = useState([]);
     const [subject, setSubject] = useState('');
     const [isFullDriveUser, setIsFullDriveUser] = useState(false);
+    const [showAdminMenu, setShowAdminMenu] = useState(false);
 
     useEffect(() => {
         const storedSubjects = JSON.parse(localStorage.getItem('subject'));
@@ -22,7 +23,7 @@ const SubjectDrive = () => {
                 setSubject(storedSubjects[0]);
             }
         } else {
-            setLocalSubject([]);  // fallback to empty array
+            setLocalSubject([]);
         }
     }, []);
 
@@ -36,13 +37,44 @@ const SubjectDrive = () => {
             width: '100%',
             position: 'relative'
         }}>
+            {/* ⚙️ 톱니바퀴 */}
+            <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
+                <FontAwesomeIcon
+                    icon={faCog}
+                    style={{ color: '#b80b92', fontSize: '24px', cursor: 'pointer' }}
+                    onClick={() => setShowAdminMenu(prev => !prev)}
+                />
+                {showAdminMenu && (
+                    <div
+                        style={{
+                            marginTop: '8px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #ccc',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                        }}
+                        onClick={() => navigate('/users')}
+                    >
+                        Admin
+                    </div>
+                )}
+            </div>
+
+            {/* 타이틀 */}
             <h1 style={{
                 marginBottom: '20px',
                 fontSize: '24px',
                 fontWeight: 'bold'
-            }}>{isFullDriveUser ? 'Access Curriculum' : 'Select Your Subject'}</h1>
+            }}>
+                {isFullDriveUser ? 'Access Curriculum' : 'Select Your Subject'}
+            </h1>
 
-            {/* ✅ 안전하게 map 사용 */}
+            {/* 드롭다운 */}
             {Array.isArray(localSubject) && localSubject.length > 0 && !isFullDriveUser && (
                 <select
                     onChange={(e) => setSubject(e.target.value)}
@@ -62,11 +94,14 @@ const SubjectDrive = () => {
                     }}
                 >
                     {localSubject.map((s) => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s}>
+                            {s}
+                        </option>
                     ))}
                 </select>
             )}
 
+            {/* 버튼 */}
             <button
                 onClick={() => {
                     if (subject === '') {
@@ -94,17 +129,9 @@ const SubjectDrive = () => {
             >
                 Access {isFullDriveUser ? 'Curriculum' : `${subject} Curriculum`}
             </button>
-
-            {isFullDriveUser && (
-                <i
-                    style={{ position: 'absolute', top: '10px', right: '10px', color: '#b80b92', fontSize: '24px', cursor: 'pointer' }}
-                    onClick={() => { navigate('/users'); }}
-                >
-                    <FontAwesomeIcon icon={faCog} />
-                </i>
-            )}
         </div>
     );
 }
 
 export default SubjectDrive;
+
