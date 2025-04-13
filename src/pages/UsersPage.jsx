@@ -166,15 +166,11 @@ const AdminPage = () => {
     }
   };
 
-  const handleDeleteUser = async (userId, uid) => {
+  const handleDeleteUser = async (userId) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
       await deleteDoc(doc(db, "users", userId));
-      const currentUser = auth.currentUser;
-      if (currentUser && currentUser.uid === uid) {
-        await deleteUser(currentUser);
-        navigate("/login");
-      }
+      alert("User deleted from Firestore.");
     } catch (error) {
       alert("Error deleting user: " + error.message);
     }
@@ -261,7 +257,7 @@ const AdminPage = () => {
               <td>
                 <button onClick={() => handleEditUser(user)}>Edit</button>
                 <button onClick={() => handleResetPassword(user.id)}>Reset Password</button>
-                <button onClick={() => handleDeleteUser(user.id, user.uid)} style={{ color: 'red' }}>Delete</button>
+                <button onClick={() => handleDeleteUser(user.id)} style={{ color: 'red' }}>Delete</button>
               </td>
             </tr>
           ))}
@@ -291,4 +287,3 @@ const modalContentStyle = {
 };
 
 export default AdminPage;
-
