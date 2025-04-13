@@ -1,12 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../utils/firebase_store";
-import {
-  collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc, serverTimestamp
-} from "firebase/firestore";
+import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { auth } from "../utils/firebase_auth";
-import {
-  createUserWithEmailAndPassword, deleteUser, getAuth
-} from "firebase/auth";
+import { createUserWithEmailAndPassword, deleteUser, getAuth } from "firebase/auth";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCog } from '@fortawesome/free-solid-svg-icons';
 import { driveLink } from "../utils/f_config";
@@ -39,7 +35,7 @@ const SUBJECTS = {
   }
 };
 
-const UsersPage = () => {
+const AdminPage = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -115,7 +111,7 @@ const UsersPage = () => {
       const currentUser = auth.currentUser;
       if (currentUser && currentUser.uid === uid) {
         await deleteUser(currentUser);
-        navigate('/login');
+        navigate('/login'); // Redirect to login after deleting current user
       }
       setUsers(users.filter((user) => user.id !== userId));
       setFilteredUsers(filteredUsers.filter((user) => user.id !== userId));
@@ -169,33 +165,227 @@ const UsersPage = () => {
     }
   };
 
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setEditingUser(null);
+    setUpdatedUser({ firstName: "", lastName: "", email: "", password: "", subject: [], role: "", gradeLevel: "", courseCategory: "" });
+  };
+
+  const handleGradeLevelChange = (e, isNew = false) => {
+    const value = e.target.value;
+    if (isNew) {
+      setNewUser(prev => ({ ...prev, gradeLevel: value, courseCategory: "", subject: [] }));
+    } else {
+      setUpdatedUser(prev => ({ ...prev, gradeLevel: value, courseCategory: "", subject: [] }));
+    }
+  };
+
+  const handleCourseCategoryChange = (e, isNew = false) => {
+    const value = e.target.value;
+    if (isNew) {
+      setNewUser(prev => ({ ...prev, courseCategory: value, subject: [] }));
+    } else {
+      setUpdatedUser(prev => ({ ...prev, courseCategory: value, subject: [] }));
+    }
+  };
+
+  const handleSubjectChange = (e, isNew = false) => {
+    const { value, checked } = e.target;
+    if (isNew) {
+      setNewUser(prev => {
+        const updatedSubjects = checked
+          ? [...prev.subject, value]
+          : prev.subject.filter(subject => subject !== value);
+        return { ...prev, subject: updatedSubjects };
+      });
+    } else {
+      setUpdatedUser(prev => {
+        const updatedSubjects = checked
+          ? [...prev.subject, value]
+          : prev.subject.filter(subject => subject !== value);
+        return { ...prev, subject: updatedSubjects };
+      });
+    }
+  };
+
+  const getAvailableSubjects = (gradeLevel, courseCategory) => {
+    if (gradeLevel === "High School" && courseCategory) {
+      return SUBJECTS["High School"][courseCategory] || [];
+    }
+    return SUBJECTS[gradeLevel] || [];
+  };
+
+  const renderSubjectsByGradeLevel = (gradeLevel, courseCategory, selectedSubjects, onChange) => {
+    const availableSubjects = getAvailableSubjects(gradeLevel, courseCategory);
+    const isAdminRole = isAddModalOpen ? newUser.role === 'admin' : updatedUser.role === 'admin';
+
+    if (isAdminRole) {
+      return null;
+    }
+
+    return (
+      <div>
+        {gradeLevel === "High School" && (
+          <div>
+            <label>Select Course Category</label>
+            <select
+              value={courseCategory || ""}
+              onChange={(e) => {
+                const newCategory = e.target.value;
+                if (isAddModalOpen) {
+                  setNewUser(prev => ({ ...prev, courseCategory: newCategory, subject: [] }));
+                } else {
+                  setUpdatedUser(prev => ({ ...prev, courseCategory: newCategory, subject: [] }));
+                }
+              }}
+            >
+              <option value="">Select Category</option>
+              {Object.keys(SUBJECTS["High School"]).map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {availableSubjects.length > 0 && (
+          <div>
+            <label>Choose your Subjects</label>
+            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #ccc', padding: '5px' }}>
+              {availableSubjects.map((subject) => (
+                <div key={subject}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      value={subject}
+                      checked={selectedSubjects?.includes(subject) || false}
+                      onChange={onChange}
+                    />
+                    {subject}
+                  </label>
+                </div>
+              ))}
+              {(isAddModalOpen ? newUser.subject : updatedUser.subject)
+                ?.filter(subject => !availableSubjects.includes(subject))
+                ?.map(subject => (
+                  <div key={subject}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        value={subject}
+                        checked={selectedSubjects?.includes(subject) || false}
+                        onChange={onChange}
+                      />
+                      {subject} <span style={{ fontStyle: 'italic', color: 'gray' }}>(Other)</span>
+                    </label>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+        {availableSubjects.length === 0 && gradeLevel !== 'High School' && (
+          <div>
+            <label>Choose your Subjects</label>
+            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #ccc', padding: '5px' }}>
+              {(isAddModalOpen ? newUser.subject : updatedUser.subject)?.map(subject => (
+                <div key={subject}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      value={subject}
+                      checked={selectedSubjects?.includes(subject) || false}
+                      onChange={onChange}
+                    />
+                    {subject} <span style={{ fontStyle: 'italic', color: 'gray' }}>(Other)</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+            {(isAddModalOpen ? newUser.subject : updatedUser.subject)?.length === 0 && <p>No subjects available for this grade level.</p>}
+          </div>
+        )}
+        {!gradeLevel && <p>Choose your subjects after selecting a grade level.</p>}
+      </div>
+    );
+  };
+
+  const handleRoleChangeNew = (e) => {
+    const role = e.target.value;
+    setNewUser(prev => ({ ...prev, role, subject: role === 'admin' ? ["Full Drive"] : [], gradeLevel: "", courseCategory: "" }));
+  };
+
+  const handleRoleChangeEdit = (e) => {
+    const role = e.target.value;
+    setUpdatedUser(prev => ({ ...prev, role, subject: role === 'admin' ? ["Full Drive"] : [], gradeLevel: "", courseCategory: "" }));
+  };
+
   return (
     <div>
-      <h1>Users Page</h1>
-      <input type="text" value={searchQuery} onChange={handleSearchChange} placeholder="Search by name or email" />
+      <h1>Admin Page</h1>
+
+      <div style={{ marginBottom: '15px' }}>
+        <input
+          type="text"
+          placeholder="Search users by name or email"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '300px' }}
+        />
+      </div>
+
       <button onClick={handleOpenAddModal}>Add User</button>
 
-      <table>
+      {isAddModalOpen && (
+        <div className="modal" style={modalStyle}>
+          <div className="modal-content" style={modalContentStyle}>
+            <h2>Add New User</h2>
+            <input type="text" placeholder="First Name" value={newUser.firstName} onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })} />
+            <input type="text" placeholder="Last Name" value={newUser.lastName} onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })} />
+            <input type="email" placeholder="Email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+            <select value={newUser.role} onChange={handleRoleChangeNew}>
+              <option value="">Choose your role</option>
+              <option value="teacher">Teacher</option>
+              <option value="admin">Admin</option>
+            </select>
+            {newUser.role === 'teacher' && (
+              <>
+                <select value={newUser.gradeLevel} onChange={(e) => handleGradeLevelChange(e, true)}>
+                  <option value="">Choose Subjects</option>
+                  <option value="Elementary School">Elementary School</option>
+                  <option value="Middle School">Middle School</option>
+                  <option value="High School">High School</option>
+                </select>
+                {newUser.gradeLevel && renderSubjectsByGradeLevel(newUser.gradeLevel, newUser.courseCategory, newUser.subject, (e) => handleSubjectChange(e, true))}
+                {!newUser.gradeLevel && <p>Choose your subjects after selecting a grade level.</p>}
+              </>
+            )}
+            <button onClick={handleAddUser}>Add</button>
+            <button onClick={handleCloseAddModal}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <h2>User List</h2>
+      <table border="1" width="100%" style={{ borderCollapse: "collapse", textAlign: "left" }}>
         <thead>
           <tr>
-            <th>First</th>
-            <th>Last</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Action</th>
+            <th style={{ textAlign: 'center' }}>First Name</th>
+            <th style={{ textAlign: 'center' }}>Last Name</th>
+            <th style={{ textAlign: 'center' }}>Email</th>
+            <th style={{ textAlign: 'center' }}>Role</th>
+            <th style={{ textAlign: 'center' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {filteredUsers.map(user => (
+          {filteredUsers.map((user) => (
             <tr key={user.id}>
-              <td>{user.firstName}</td>
-              <td>{user.lastName}</td>
-              <td>{user.email}</td>
-              <td>{user.role}</td>
+              <td>{user.firstName || 'N/A'}</td>
+              <td>{user.lastName || 'N/A'}</td>
+              <td>{user.email || 'N/A'}</td>
+              <td>{user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'N/A'}</td>
               <td>
                 <button onClick={() => handleEditUser(user)}>Edit</button>
-                <button onClick={() => handleResetPassword(user.id)}>Reset</button>
-                <button onClick={() => handleDeleteUser(user.id, user.uid)}>X</button>
+                <button onClick={() => handleResetPassword(user.id)}>Reset Password</button>
+                <button onClick={() => handleDeleteUser(user.id, user.uid)} style={{ color: 'red', fontWeight: 'bold' }}>X</button>
               </td>
             </tr>
           ))}
@@ -203,32 +393,31 @@ const UsersPage = () => {
       </table>
 
       {isModalOpen && (
-        <div style={modalStyle}>
-          <div style={modalContentStyle}>
+        <div className="modal" style={modalStyle}>
+          <div className="modal-content" style={modalContentStyle}>
             <h2>Edit User</h2>
-            <input value={updatedUser.firstName} onChange={(e) => setUpdatedUser({ ...updatedUser, firstName: e.target.value })} />
-            <input value={updatedUser.lastName} onChange={(e) => setUpdatedUser({ ...updatedUser, lastName: e.target.value })} />
-            <input value={updatedUser.email} onChange={(e) => setUpdatedUser({ ...updatedUser, email: e.target.value })} />
-            <button onClick={handleSaveUser}>Save</button>
-            <button onClick={() => setIsModalOpen(false)}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {isAddModalOpen && (
-        <div style={modalStyle}>
-          <div style={modalContentStyle}>
-            <h2>Add User</h2>
-            <input placeholder="First Name" value={newUser.firstName} onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })} />
-            <input placeholder="Last Name" value={newUser.lastName} onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })} />
-            <input placeholder="Email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
-            <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
-              <option value="">Choose role</option>
+            <input type="text" placeholder="First Name" value={updatedUser.firstName} onChange={(e) => setUpdatedUser({ ...updatedUser, firstName: e.target.value })} />
+            <input type="text" placeholder="Last Name" value={updatedUser.lastName} onChange={(e) => setUpdatedUser({ ...updatedUser, lastName: e.target.value })} />
+            <input type="email" placeholder="Email" value={updatedUser.email} onChange={(e) => setUpdatedUser({ ...updatedUser, email: e.target.value })} />
+            <select value={updatedUser.role} onChange={handleRoleChangeEdit}>
+              <option value="">Choose your role</option>
               <option value="teacher">Teacher</option>
               <option value="admin">Admin</option>
             </select>
-            <button onClick={handleAddUser}>Add</button>
-            <button onClick={handleCloseAddModal}>Cancel</button>
+            {updatedUser.role === 'teacher' && (
+              <>
+                <select value={updatedUser.gradeLevel} onChange={handleGradeLevelChange}>
+                  <option value="">Choose Subjects</option>
+                  <option value="Elementary School">Elementary School</option>
+                  <option value="Middle School">Middle School</option>
+                  <option value="High School">High School</option>
+                </select>
+                {updatedUser.gradeLevel && renderSubjectsByGradeLevel(updatedUser.gradeLevel, updatedUser.courseCategory, updatedUser.subject, handleSubjectChange)}
+                {!updatedUser.gradeLevel && <p>Choose your subjects after selecting a grade level.</p>}
+              </>
+            )}
+            <button onClick={handleSaveUser}>Save</button>
+            <button onClick={handleModalClose}>Cancel</button>
           </div>
         </div>
       )}
@@ -237,14 +426,22 @@ const UsersPage = () => {
 };
 
 const modalStyle = {
-  position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-  backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
-  justifyContent: 'center', alignItems: 'center'
+  position: 'fixed',
+  top: '0',
+  left: '0',
+  width: '100%',
+  height: '100%',
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
 };
 
 const modalContentStyle = {
-  backgroundColor: 'white', padding: '20px', borderRadius: '10px', width: '400px'
+  backgroundColor: 'white',
+  padding: '20px',
+  borderRadius: '8px',
+  width: '400px',
 };
 
-export default UsersPage;
-
+export default AdminPage;
