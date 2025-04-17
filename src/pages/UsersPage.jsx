@@ -54,17 +54,17 @@ const AdminPage = () => {
           const [firstName, lastName, email, role] = rows[i].map(v => v?.trim());
 
           if (!firstName || !lastName || !email || !role) {
-            alert(`Row ${i + 1}: All fields (first name, last name, email, role) are required.`);
+            alert(Row ${i + 1}: All fields (first name, last name, email, role) are required.);
             return;
           }
 
           if (!/^[^\s@]+@gmail\.com$/.test(email)) {
-            alert(`Row ${i + 1}: Invalid email format. Must end with @gmail.com.`);
+            alert(Row ${i + 1}: Invalid email format. Must end with @gmail.com.);
             return;
           }
 
           if (!["Teacher", "Admin"].includes(role)) {
-            alert(`Row ${i + 1}: Role must be either 'Teacher' or 'Admin'.`);
+            alert(Row ${i + 1}: Role must be either 'Teacher' or 'Admin'.);
             return;
           }
         }
@@ -90,8 +90,8 @@ const AdminPage = () => {
               courseCategory: "",
             });
           } catch (error) {
-            console.error(`❌ Error processing ${email}:`, error.message);
-            alert(`Error adding ${email}: ${error.message}`);
+            console.error(❌ Error processing ${email}:, error.message);
+            alert(Error adding ${email}: ${error.message});
           }
         }
         alert("✅ All users uploaded successfully.");
