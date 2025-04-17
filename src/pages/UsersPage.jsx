@@ -1,11 +1,25 @@
-// ✅ 필요한 import 추가
 import React, { useRef, useEffect, useState } from "react";
 import Papa from "papaparse";
 import { db } from "../utils/firebase_store";
 import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { auth } from "../utils/firebase_auth";
-import { createUserWithEmailAndPassword, deleteUser, getAuth } from "firebase/auth";
+import { createUserWithEmailAndPassword, getAuth } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
+
+const VALID_SUBJECTS = [
+  "1st Grade", "2nd Grade", "3rd Grade", "4th Grade", "5th Grade",
+  "Pre-Kindergarten", "Kindergarten", "6th Grade ELA", "Math 6AB",
+  "Introduction to World Languages", "Spanish 6", "6th Grade Social Studies", "6th Grade Science",
+  "6th Grade Band", "6th Grade Computer Science", "6th Grade Creative Problem Solving",
+  "6th Grade Visual Arts", "6th Grade Physical Education", "6th Grade Orchestra",
+  "Math 6B/7AB", "Math 7AB", "7th Grade ELA", "Spanish I(Middle School)", "7th Grade Social Studies",
+  "7th Grade Science", "7th Grade Band", "7th Grade Computer Science", "7th Grade Creative Problem Solving",
+  "7th Grade Visual Arts", "7th Grade Physical Education", "7th Grade Orchestra", "Spanish II(Middle School)", "8th Grade ELA"
+];
+
+const validateSubjects = (subjectsString) => {
+  const subjectsArray = subjectsString.split(",").map(subject => subject.trim());
+  return subjectsArray.every(subj => VALID_SUBJECTS.includes(subj));
+};
 
 const AdminPage = () => {
   const [users, setUsers] = useState([]);
@@ -32,14 +46,14 @@ const AdminPage = () => {
   useEffect(() => {
     const lowerCaseQuery = searchQuery.toLowerCase();
     const results = users.filter(user =>
-      (user.firstName?.toLowerCase().includes(lowerCaseQuery) ||
-        user.lastName?.toLowerCase().includes(lowerCaseQuery) ||
-        user.email?.toLowerCase().includes(lowerCaseQuery))
+      user.firstName?.toLowerCase().includes(lowerCaseQuery) ||
+      user.lastName?.toLowerCase().includes(lowerCaseQuery) ||
+      user.email?.toLowerCase().includes(lowerCaseQuery)
     );
     setFilteredUsers(results);
   }, [searchQuery, users]);
 
-  const handleCSVUpload = (e) => {
+  const handleCSVUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !file.name.endsWith(".csv")) {
       alert("Only CSV files are allowed.");
@@ -47,137 +61,40 @@ const AdminPage = () => {
     }
 
     Papa.parse(file, {
-      complete: async function (results) {
-        const rows = results.data.filter(row => row.length >= 4);
+      complete: async (results) => {
+        const rows = results.data.filter(row => row.length >= 5);
 
         for (let i = 0; i < rows.length; i++) {
-          const [firstName, lastName, email, role] = rows[i].map(v => v?.trim());
-
-          if (!firstName || !lastName || !email || !role) {
-            alert(Row ${i + 1}: All fields (first name, last name, email, role) are required.);
+          const [firstName, lastName, email, role, subject] = rows[i].map(v => v?.trim());
+          if (!firstName || !lastName || !email || !role || !subject) {
+            alert(`Row ${i + 1}: All fields are required.`);
             return;
           }
-
-          if (!/^[^\s@]+@gmail\.com$/.test(email)) {
-            alert(Row ${i + 1}: Invalid email format. Must end with @gmail.com.);
-            return;
-          }
-
-          if (!["Teacher", "Admin"].includes(role)) {
-            alert(Row ${i + 1}: Role must be either 'Teacher' or 'Admin'.);
+          if (!/^[^\s@]+@gmail\.com$/.test(email) || !["Teacher", "Admin"].includes(role) || !validateSubjects(subject)) {
+            alert(`Row ${i + 1}: Validation failed.`);
             return;
           }
         }
 
         for (let i = 0; i < rows.length; i++) {
-          const [firstName, lastName, email, role] = rows[i].map(v => v.trim());
+          const [firstName, lastName, email, role, subject] = rows[i].map(v => v.trim());
           const password = "FSA123";
           try {
             const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-            const uid = userCredential.user.uid;
-
             await addDoc(collection(db, "users"), {
-              uid,
-              firstName,
-              lastName,
-              email,
-              password,
-              subject: role === "Admin" ? ["Full Drive"] : [],
-              role: role.toLowerCase(),
-              authProvider: "admin",
-              createdAt: serverTimestamp(),
-              gradeLevel: "",
-              courseCategory: "",
+              uid: userCredential.user.uid,
+              firstName, lastName, email, password,
+              subject: subject.split(",").map(s => s.trim()),
+              role: role.toLowerCase(), authProvider: "admin", createdAt: serverTimestamp()
             });
           } catch (error) {
-            console.error(❌ Error processing ${email}:, error.message);
-            alert(Error adding ${email}: ${error.message});
+            alert(`Error adding ${email}: ${error.message}`);
           }
         }
         alert("✅ All users uploaded successfully.");
       },
-      error: (err) => {
-        alert("Error parsing CSV file: " + err.message);
-      },
+      error: (err) => alert("Error parsing CSV file: " + err.message),
     });
-  };
-
-  const handleOpenAddModal = () => {
-    setIsAddModalOpen(true);
-    setNewUser({ firstName: "", lastName: "", email: "", password: "FSA123", role: "" });
-  };
-
-  const handleCloseAddModal = () => {
-    setIsAddModalOpen(false);
-  };
-
-  const handleAddUser = async () => {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, newUser.email, newUser.password);
-      const uid = userCredential.user.uid;
-
-      await addDoc(collection(db, "users"), {
-        uid,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        email: newUser.email,
-        password: newUser.password,
-        subject: newUser.role === "admin" ? ["Full Drive"] : [],
-        role: newUser.role || 'teacher',
-        authProvider: "admin",
-        createdAt: serverTimestamp(),
-        gradeLevel: "",
-        courseCategory: "",
-      });
-      handleCloseAddModal();
-    } catch (error) {
-      alert("Error adding user: " + error.message);
-    }
-  };
-
-  const handleEditUser = (user) => {
-    setEditingUser(user);
-    setUpdatedUser(user);
-    setIsModalOpen(true);
-  };
-
-  const handleSaveUser = async () => {
-    try {
-      await updateDoc(doc(db, "users", editingUser.id), {
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
-        email: updatedUser.email,
-        role: updatedUser.role,
-      });
-      setIsModalOpen(false);
-    } catch (error) {
-      alert("Error saving user: " + error.message);
-    }
-  };
-
-  const handleResetPassword = async (userId) => {
-    try {
-      await updateDoc(doc(db, "users", userId), {
-        password: "FSA123",
-      });
-      alert("Password has been reset to default (FSA123)");
-    } catch (error) {
-      alert("Error resetting password: " + error.message);
-    }
-  };
-
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
-    try {
-      await deleteDoc(doc(db, "users", userId));
-      alert("User deleted from Firestore.");
-    } catch (error) {
-      alert("Error deleting user: " + error.message);
-    }
-  };
-
-  const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
   };
 
   return (
@@ -188,10 +105,10 @@ const AdminPage = () => {
           type="text"
           placeholder="Search users by name or email"
           value={searchQuery}
-          onChange={handleSearchChange}
+          onChange={(e) => setSearchQuery(e.target.value)}
           style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '300px' }}
         />
-        <button onClick={handleOpenAddModal}>Add User</button>
+        <button onClick={() => setIsAddModalOpen(true)}>Add User</button>
         <button onClick={() => fileInputRef.current.click()}>CSV Bulk Upload</button>
         <input
           type="file"
@@ -215,7 +132,7 @@ const AdminPage = () => {
               <option value="admin">Admin</option>
             </select>
             <button onClick={handleAddUser}>Add</button>
-            <button onClick={handleCloseAddModal}>Cancel</button>
+            <button onClick={() => setIsAddModalOpen(false)}>Cancel</button>
           </div>
         </div>
       )}
@@ -255,9 +172,21 @@ const AdminPage = () => {
               <td>{user.email || 'N/A'}</td>
               <td>{user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'N/A'}</td>
               <td>
-                <button onClick={() => handleEditUser(user)}>Edit</button>
-                <button onClick={() => handleResetPassword(user.id)}>Reset Password</button>
-                <button onClick={() => handleDeleteUser(user.id)} style={{ color: 'red' }}>Delete</button>
+                <button onClick={() => {
+                  setEditingUser(user);
+                  setUpdatedUser(user);
+                  setIsModalOpen(true);
+                }}>Edit</button>
+                <button onClick={async () => {
+                  await updateDoc(doc(db, "users", user.id), { password: "FSA123" });
+                  alert("Password has been reset to default (FSA123)");
+                }}>Reset Password</button>
+                <button onClick={async () => {
+                  if (window.confirm("Are you sure you want to delete this user?")) {
+                    await deleteDoc(doc(db, "users", user.id));
+                    alert("User deleted from Firestore.");
+                  }
+                }} style={{ color: 'red' }}>Delete</button>
               </td>
             </tr>
           ))}
