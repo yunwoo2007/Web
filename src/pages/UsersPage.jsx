@@ -21,6 +21,25 @@ const validateSubjects = (subjectsString) => {
   return subjectsArray.every(subj => VALID_SUBJECTS.includes(subj));
 };
 
+const modalStyle = {
+  position: 'fixed',
+  top: '0',
+  left: '0',
+  width: '100%',
+  height: '100%',
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+};
+
+const modalContentStyle = {
+  backgroundColor: 'white',
+  padding: '20px',
+  borderRadius: '8px',
+  width: '400px',
+};
+
 const AdminPage = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -95,6 +114,43 @@ const AdminPage = () => {
       },
       error: (err) => alert("Error parsing CSV file: " + err.message),
     });
+  };
+
+  const handleAddUser = async () => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, newUser.email, newUser.password);
+      const uid = userCredential.user.uid;
+      await addDoc(collection(db, "users"), {
+        uid,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        password: newUser.password,
+        subject: newUser.role === "admin" ? ["Full Drive"] : [],
+        role: newUser.role || 'teacher',
+        authProvider: "admin",
+        createdAt: serverTimestamp(),
+        gradeLevel: "",
+        courseCategory: "",
+      });
+      setIsAddModalOpen(false);
+    } catch (error) {
+      alert("Error adding user: " + error.message);
+    }
+  };
+
+  const handleSaveUser = async () => {
+    try {
+      await updateDoc(doc(db, "users", editingUser.id), {
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        role: updatedUser.role,
+      });
+      setIsModalOpen(false);
+    } catch (error) {
+      alert("Error saving user: " + error.message);
+    }
   };
 
   return (
@@ -194,25 +250,6 @@ const AdminPage = () => {
       </table>
     </div>
   );
-};
-
-const modalStyle = {
-  position: 'fixed',
-  top: '0',
-  left: '0',
-  width: '100%',
-  height: '100%',
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-};
-
-const modalContentStyle = {
-  backgroundColor: 'white',
-  padding: '20px',
-  borderRadius: '8px',
-  width: '400px',
 };
 
 export default AdminPage;
