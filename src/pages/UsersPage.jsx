@@ -1,7 +1,10 @@
 import React, { useRef, useEffect, useState } from "react";
 import Papa from "papaparse";
 import { db } from "../utils/firebase_store";
-import { collection, onSnapshot, deleteDoc, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection, onSnapshot, deleteDoc, doc,
+  addDoc, updateDoc, serverTimestamp
+} from "firebase/firestore";
 import { createUserWithEmailAndPassword, getAuth } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 
@@ -82,15 +85,22 @@ const AdminPage = () => {
     Papa.parse(file, {
       complete: async (results) => {
         const rows = results.data.filter(row => row.length >= 5);
-
         for (let i = 0; i < rows.length; i++) {
           const [firstName, lastName, email, role, subject] = rows[i].map(v => v?.trim());
           if (!firstName || !lastName || !email || !role || !subject) {
-            alert(`Row ${i + 1}: All fields are required.`);
+            alert(`Row ${i + 1}: Missing fields.`);
             return;
           }
-          if (!/^[^\s@]+@gmail\.com$/.test(email) || !["Teacher", "Admin"].includes(role) || !validateSubjects(subject)) {
-            alert(`Row ${i + 1}: Validation failed.`);
+          if (!/^[^\s@]+@gmail\.com$/.test(email)) {
+            alert(`Row ${i + 1}: Email must end with @gmail.com.`);
+            return;
+          }
+          if (!["Teacher", "Admin"].includes(role)) {
+            alert(`Row ${i + 1}: Invalid role.`);
+            return;
+          }
+          if (!validateSubjects(subject)) {
+            alert(`Row ${i + 1}: Invalid subject(s).`);
             return;
           }
         }
@@ -104,7 +114,9 @@ const AdminPage = () => {
               uid: userCredential.user.uid,
               firstName, lastName, email, password,
               subject: subject.split(",").map(s => s.trim()),
-              role: role.toLowerCase(), authProvider: "admin", createdAt: serverTimestamp()
+              role: role.toLowerCase(),
+              authProvider: "admin",
+              createdAt: serverTimestamp()
             });
           } catch (error) {
             alert(`Error adding ${email}: ${error.message}`);
@@ -175,6 +187,7 @@ const AdminPage = () => {
         />
       </div>
 
+      {/* Add User Modal */}
       {isAddModalOpen && (
         <div className="modal" style={modalStyle}>
           <div className="modal-content" style={modalContentStyle}>
@@ -193,6 +206,7 @@ const AdminPage = () => {
         </div>
       )}
 
+      {/* Edit User Modal */}
       {isModalOpen && (
         <div className="modal" style={modalStyle}>
           <div className="modal-content" style={modalContentStyle}>
@@ -210,6 +224,7 @@ const AdminPage = () => {
         </div>
       )}
 
+      {/* User Table */}
       <table border="1" width="100%" style={{ borderCollapse: "collapse", textAlign: "left" }}>
         <thead>
           <tr>
@@ -253,3 +268,4 @@ const AdminPage = () => {
 };
 
 export default AdminPage;
+
