@@ -76,57 +76,79 @@ const AdminPage = () => {
   }, [searchQuery, users]);
 
   const handleCSVUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !file.name.endsWith(".csv")) {
-      alert("Only CSV files are allowed.");
-      return;
-    }
+  const file = e.target.files[0];
+  if (!file || !file.name.endsWith(".csv")) {
+    alert("Only CSV files are allowed.");
+    return;
+  }
 
-    Papa.parse(file, {
-      complete: async (results) => {
-        const rows = results.data.filter(row => row.length >= 5);
-        for (let i = 0; i < rows.length; i++) {
-          const [firstName, lastName, email, role, subject] = rows[i].map(v => v?.trim());
-          if (!firstName || !lastName || !email || !role || !subject) {
-            alert(`Row ${i + 1}: Missing fields.`);
-            return;
-          }
-          if (!/^[^\s@]+@gmail\.com$/.test(email)) {
-            alert(`Row ${i + 1}: Email must end with @gmail.com.`);
-            return;
-          }
-          if (!["Teacher", "Admin"].includes(role)) {
-            alert(`Row ${i + 1}: Invalid role.`);
-            return;
-          }
-          if (!validateSubjects(subject)) {
-            alert(`Row ${i + 1}: Invalid subject(s).`);
-            return;
-          }
+  Papa.parse(file, {
+    complete: async (results) => {
+      const rows = results.data.filter(row => row.length >= 5);
+      let validRows = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const [firstName, lastName, email, role, subjectStr] = rows[i].map(v => v?.trim());
+
+        if (!firstName || !lastName || !email || !role || !subjectStr) {
+          console.warn(`Row ${i + 1}: Missing field(s). Skipping.`);
+          continue;
         }
 
-        for (let i = 0; i < rows.length; i++) {
-          const [firstName, lastName, email, role, subject] = rows[i].map(v => v.trim());
-          const password = "FSA123";
-          try {
-            const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-            await addDoc(collection(db, "users"), {
-              uid: userCredential.user.uid,
-              firstName, lastName, email, password,
-              subject: subject.split(",").map(s => s.trim()),
-              role: role.toLowerCase(),
-              authProvider: "admin",
-              createdAt: serverTimestamp()
-            });
-          } catch (error) {
-            alert(`Error adding ${email}: ${error.message}`);
-          }
+        if (!/^[^\s@]+@gmail\.com$/.test(email)) {
+          console.warn(`Row ${i + 1}: Invalid email. Skipping.`);
+          continue;
         }
-        alert("✅ All users uploaded successfully.");
-      },
-      error: (err) => alert("Error parsing CSV file: " + err.message),
-    });
-  };
+
+        if (!["Teacher", "Admin"].includes(role)) {
+          console.warn(`Row ${i + 1}: Invalid role. Skipping.`);
+          continue;
+        }
+
+        const subjectList = subjectStr.split(",").map(s => s.trim());
+        const isValidSubject = subjectList.every(subj => VALID_SUBJECTS.includes(subj));
+
+        if (!isValidSubject) {
+          console.warn(`Row ${i + 1}: Invalid subject(s): [${subjectList.join(", ")}]. Skipping.`);
+          continue;
+        }
+
+        validRows.push({ firstName, lastName, email, role, subjectList });
+      }
+
+      if (validRows.length === 0) {
+        alert("❌ No valid rows to upload.");
+        return;
+      }
+
+      for (let user of validRows) {
+        const { firstName, lastName, email, role, subjectList } = user;
+        const password = "FSA123";
+
+        try {
+          const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+          await addDoc(collection(db, "users"), {
+            uid: userCredential.user.uid,
+            firstName,
+            lastName,
+            email,
+            password,
+            subject: subjectList,
+            role: role.toLowerCase(),
+            authProvider: "admin",
+            createdAt: serverTimestamp()
+          });
+        } catch (error) {
+          console.error(`Error adding ${email}:`, error.message);
+        }
+      }
+
+      alert(`✅ ${validRows.length} users successfully uploaded.`);
+    },
+    error: (err) => alert("Error parsing CSV file: " + err.message),
+  });
+};
+
 
   const handleAddUser = async () => {
     try {
